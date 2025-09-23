@@ -1,0 +1,142 @@
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: 'job_seeker' | 'consultant' | 'community_manager' | 'sales_rep';
+  createdAt: Date;
+  preferences: {
+    commonalityOrder: ('employer' | 'education' | 'mutual' | 'event')[];
+    draftTone: 'professional' | 'friendly' | 'concise';
+    reminderFrequency: number; // days
+  };
+}
+
+export interface Contact {
+  id: string;
+  name: string;
+  title: string;
+  company: string;
+  email?: string;
+  linkedinUrl?: string;
+  degree: 1 | 2; // connection degree - removed 3rd degree
+  relationshipStrength: 'strong' | 'medium' | 'weak';
+  commonalities: Commonality[];
+  notes: string;
+  tags: string[];
+  addedAt: Date;
+  lastInteraction?: Date;
+}
+
+export interface Commonality {
+  id: string;
+  type: 'employer' | 'education' | 'mutual' | 'event' | 'project';
+  description: string;
+  evidence: string;
+  confidence: number; // 0-1
+  timeframe?: string;
+}
+
+export interface Bridge {
+  id: string;
+  bridgeContactId: string; // 1st degree contact
+  targetContactId: string; // 2nd degree target
+  strength: number; // 0-1
+  commonality: Commonality;
+  reasoning: string;
+}
+
+export interface Conversation {
+  id: string;
+  messages: Message[];
+  createdAt: Date;
+  updatedAt: Date;
+  topic?: string;
+}
+
+export interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+  metadata?: {
+    contacts?: string[]; // contact IDs mentioned
+    bridges?: string[]; // bridge IDs suggested
+    drafts?: string[]; // draft IDs generated
+  };
+}
+
+export interface Draft {
+  id: string;
+  targetContactId: string;
+  bridgeContactId?: string; // for intro requests
+  type: 'linkedin_message' | 'linkedin_inmail' | 'gmail_intro' | 'follow_up';
+  subject?: string;
+  content: string;
+  commonalityUsed: Commonality;
+  tone: 'professional' | 'friendly' | 'concise';
+  status: 'draft' | 'sent' | 'archived';
+  createdAt: Date;
+  sentAt?: Date;
+}
+
+export interface Email {
+  id: string;
+  draftId: string;
+  recipientEmail: string;
+  subject: string;
+  content: string;
+  sentAt: Date;
+  deliveryStatus: 'sent' | 'delivered' | 'failed';
+}
+
+export interface Meeting {
+  id: string;
+  title: string;
+  attendees: string[]; // contact IDs
+  startTime: Date;
+  duration: number; // minutes
+  meetLink?: string;
+  notes?: string;
+  status: 'scheduled' | 'completed' | 'cancelled';
+  createdAt: Date;
+}
+
+export interface Task {
+  id: string;
+  contactId: string;
+  type: 'follow_up' | 'reminder' | 'meeting_prep';
+  title: string;
+  description: string;
+  dueDate: Date;
+  priority: 'low' | 'medium' | 'high';
+  status: 'pending' | 'completed' | 'snoozed';
+  createdAt: Date;
+  completedAt?: Date;
+}
+
+export interface Recommendation {
+  id: string;
+  contactId: string;
+  type: 'connect' | 'follow_up' | 'meeting';
+  reasoning: string;
+  confidence: number;
+  commonality: Commonality;
+  suggestedAction: string;
+  createdAt: Date;
+}
+
+export interface Activity {
+  id: string;
+  type: 'connection_made' | 'message_sent' | 'message_received' | 'meeting_scheduled' | 'meeting_completed' | 'task_completed' | 'draft_created' | 'linkedin_connected' | 'gmail_connected' | 'calendar_connected';
+  title: string;
+  description: string;
+  contactId?: string;
+  contactName?: string;
+  metadata?: {
+    platform?: 'linkedin' | 'gmail' | 'calendar';
+    messageType?: 'intro_request' | 'follow_up' | 'direct_message';
+    meetingDuration?: number;
+    draftType?: string;
+  };
+  timestamp: Date;
+}
