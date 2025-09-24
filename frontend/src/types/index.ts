@@ -62,6 +62,13 @@ export interface Message {
     contacts?: string[]; // contact IDs mentioned
     bridges?: string[]; // bridge IDs suggested
     drafts?: string[]; // draft IDs generated
+    images?: Array<{
+      dataUrl: string;
+      dimensions: { width: number; height: number };
+      wasResized: boolean;
+      originalDimensions?: { width: number; height: number };
+    }>; // attached images
+    hasImageAnalysis?: boolean; // indicates AI analyzed images
   };
 }
 

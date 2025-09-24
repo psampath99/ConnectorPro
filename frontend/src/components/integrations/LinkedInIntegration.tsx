@@ -3,7 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Linkedin, CheckCircle, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
+import { Linkedin, CheckCircle, AlertCircle, Loader2, RefreshCw, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { storage } from '@/lib/storage';
 
 interface LinkedInIntegrationProps {
@@ -141,6 +142,9 @@ export const LinkedInIntegration = ({ onContactsImported }: LinkedInIntegrationP
       const result = await response.json();
       setImportResult(result);
       
+      // Always update the timestamp, regardless of whether new contacts were imported
+      const currentDate = new Date().toISOString();
+      
       // Store LinkedIn contacts to localStorage for dashboard access
       if (result.contacts && result.contacts.length > 0) {
         console.log('Processing LinkedIn contacts for localStorage:', result.contacts.length);
@@ -172,10 +176,9 @@ export const LinkedInIntegration = ({ onContactsImported }: LinkedInIntegrationP
         
         console.log(`✅ Saved ${formattedContacts.length} LinkedIn contacts to localStorage. Total contacts now: ${allContacts.length}`);
         
-        // Update persistent LinkedIn connection state
-        const currentDate = new Date().toISOString();
         const newContactCount = formattedContacts.length;
         
+        // Update persistent LinkedIn connection state
         saveLinkedInConnectionState({
           isConnected: true,
           lastImportDate: currentDate,
@@ -195,6 +198,18 @@ export const LinkedInIntegration = ({ onContactsImported }: LinkedInIntegrationP
           contacts: formattedContacts,
           source: 'linkedin'
         }, 'LinkedIn Import');
+      } else {
+        // Even if no new contacts were imported, update the timestamp
+        // For the contact count, show the total from this import attempt (which could be 0)
+        saveLinkedInConnectionState({
+          isConnected: true,
+          lastImportDate: currentDate,
+          contactCount: result.imported, // Show the actual count from this import
+          accessToken: accessToken
+        });
+        
+        setLastImportDate(currentDate);
+        setContactCount(result.imported); // Update display to show current import count
       }
       
       if (onContactsImported) {
@@ -247,16 +262,33 @@ export const LinkedInIntegration = ({ onContactsImported }: LinkedInIntegrationP
   return (
     <Card className="w-full max-w-2xl">
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <Linkedin className="w-6 h-6 text-blue-600" />
-          <span>LinkedIn Integration</span>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center space-x-2">
+            <Linkedin className="w-6 h-6 text-blue-600" />
+            <span>LinkedIn Integration</span>
+            {isConnected && (
+              <Badge className="bg-green-100 text-green-800">
+                <CheckCircle className="w-3 h-3 mr-1" />
+                Connected
+              </Badge>
+            )}
+          </CardTitle>
           {isConnected && (
-            <Badge className="bg-green-100 text-green-800">
-              <CheckCircle className="w-3 h-3 mr-1" />
-              Connected
-            </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDisconnectLinkedIn}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              Disconnect
+            </Button>
           )}
-        </CardTitle>
+        </div>
+        {isConnected && lastImportDate && (
+          <div className="mt-3 text-sm text-green-700">
+            <p>Last imported: {new Date(lastImportDate).toLocaleString()}</p>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {error && (
@@ -291,86 +323,69 @@ export const LinkedInIntegration = ({ onContactsImported }: LinkedInIntegrationP
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                  <span className="text-green-800 font-medium">LinkedIn Connected!</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleDisconnectLinkedIn}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                >
-                  Disconnect
-                </Button>
-              </div>
-              {lastImportDate && (
-                <div className="mt-2 text-sm text-green-700">
-                  <p>Last imported: {new Date(lastImportDate).toLocaleString()}</p>
-                  <p>{contactCount} contacts imported</p>
-                </div>
-              )}
-            </div>
 
-            <div className="flex space-x-2">
-              <Button
-                onClick={() => handleImportContacts(false)}
-                disabled={isImporting}
-                className="flex-1"
-              >
-                {isImporting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Importing...
-                  </>
-                ) : (
-                  <>
-                    <Linkedin className="w-4 h-4 mr-2" />
-                    Import New
-                  </>
-                )}
-              </Button>
-              
-              <Button
-                onClick={() => handleImportContacts(true)}
-                disabled={isImporting}
-                variant="outline"
-                className="flex-1"
-              >
-                {isImporting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Overwriting...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Overwrite All
-                  </>
-                )}
-              </Button>
-            </div>
-
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="text-sm text-blue-800">
-                <p><strong>Import New:</strong> Only imports contacts added since last import</p>
-                <p><strong>Overwrite All:</strong> Replaces all existing LinkedIn contacts</p>
+            <TooltipProvider>
+              <div className="flex space-x-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={() => handleImportContacts(false)}
+                      disabled={isImporting}
+                      className="flex-1"
+                    >
+                      {isImporting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Importing...
+                        </>
+                      ) : (
+                        <>
+                          <Linkedin className="w-4 h-4 mr-2" />
+                          Import New
+                          <Info className="w-3 h-3 ml-2 opacity-70" />
+                        </>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Only imports contacts added since last import</p>
+                  </TooltipContent>
+                </Tooltip>
+                
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={() => handleImportContacts(true)}
+                      disabled={isImporting}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      {isImporting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Overwriting...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          Overwrite All
+                          <Info className="w-3 h-3 ml-2 opacity-70" />
+                        </>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Replaces all existing LinkedIn contacts</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
-            </div>
+            </TooltipProvider>
 
             {importResult && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h4 className="font-medium text-blue-900 mb-2">Import Results</h4>
                 <div className="text-sm text-blue-800">
-                  <p>✅ Successfully imported {importResult.imported} contacts</p>
-                  <p>📊 Total LinkedIn connections: {importResult.total}</p>
-                  {importResult.imported < importResult.total && (
-                    <p className="text-blue-600 mt-1">
-                      Note: {importResult.total - importResult.imported} contacts were skipped (likely duplicates)
-                    </p>
-                  )}
+                  <p>✅ Import completed successfully</p>
                 </div>
               </div>
             )}

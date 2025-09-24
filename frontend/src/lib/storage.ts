@@ -362,11 +362,13 @@ export const storage = {
     metadata?: any;
   }) => {
     const history = storage.getFileUploadHistory();
-    history.unshift(uploadRecord); // Add to beginning for chronological order
     
-    // Keep only the last 50 uploads to prevent localStorage bloat
-    if (history.length > 50) {
-      history.splice(50);
+    // Add new upload to the beginning (newest first)
+    history.unshift(uploadRecord);
+    
+    // Enforce maximum of 5 uploads - automatically prune older ones
+    if (history.length > 5) {
+      history.splice(5); // Keep only the first 5 (newest)
     }
     
     storage.setFileUploadHistory(history);

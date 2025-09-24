@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   FileText,
   Calendar,
@@ -12,7 +13,7 @@ import {
   Clock,
   ExternalLink,
   Trash2,
-  Download
+  RefreshCw
 } from 'lucide-react';
 import { storage } from '@/lib/storage';
 
@@ -38,28 +39,29 @@ interface FileUpload {
 
 interface FileUploadHistoryProps {
   onFileClick?: (upload: FileUpload) => void;
+  refreshTrigger?: number; // Add refresh trigger prop
 }
 
-export const FileUploadHistory = ({ onFileClick }: FileUploadHistoryProps) => {
+export const FileUploadHistory = ({ onFileClick, refreshTrigger }: FileUploadHistoryProps) => {
   const [uploads, setUploads] = useState<FileUpload[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUploadHistory();
-  }, []);
+  }, [refreshTrigger]); // Re-fetch when refreshTrigger changes
 
   const fetchUploadHistory = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // For demo mode, get from localStorage first
-      const demoUploads = getLocalStorageUploads();
+      // Get uploads from localStorage (primary source for rolling history)
+      const localUploads = getLocalStorageUploads();
       
-      // Try to fetch from API (will fail in demo mode but that's ok)
+      // Try to fetch from API as backup, but prioritize localStorage for consistency
       try {
-        const response = await fetch('http://localhost:8000/api/v1/file-uploads/', {
+        const response = await fetch('http://localhost:8000/api/v1/file-uploads/?limit=5', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('accessToken') || 'demo-token'}`
           }
@@ -67,14 +69,18 @@ export const FileUploadHistory = ({ onFileClick }: FileUploadHistoryProps) => {
 
         if (response.ok) {
           const data = await response.json();
-          setUploads(data.uploads || []);
+          const apiUploads = data.uploads || [];
+          
+          // Merge API uploads with local uploads, prioritizing local for consistency
+          const mergedUploads = mergeUploads(localUploads, apiUploads);
+          setUploads(mergedUploads);
         } else {
-          // Fallback to localStorage for demo mode
-          setUploads(demoUploads);
+          // Use localStorage only
+          setUploads(localUploads);
         }
       } catch (apiError) {
-        // Fallback to localStorage for demo mode
-        setUploads(demoUploads);
+        // Use localStorage only
+        setUploads(localUploads);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch upload history');
@@ -83,12 +89,36 @@ export const FileUploadHistory = ({ onFileClick }: FileUploadHistoryProps) => {
     }
   };
 
+  const mergeUploads = (localUploads: FileUpload[], apiUploads: FileUpload[]): FileUpload[] => {
+    // Prioritize localStorage uploads for consistency, but merge with API data
+    const allUploads = [...localUploads];
+    
+    // Add any API uploads that aren't already in localStorage
+    for (const apiUpload of apiUploads) {
+      const exists = localUploads.some(local =>
+        local.id === apiUpload.id ||
+        (local.fileName === apiUpload.fileName &&
+         Math.abs(new Date(local.uploadedAt).getTime() - new Date(apiUpload.uploadedAt).getTime()) < 5000)
+      );
+      
+      if (!exists) {
+        allUploads.push(apiUpload);
+      }
+    }
+    
+    // Sort by upload date (newest first) and limit to exactly 5
+    return allUploads
+      .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
+      .slice(0, 5);
+  };
+
   const getLocalStorageUploads = (): FileUpload[] => {
     try {
-      // Get from new file upload history storage
+      // Get from new file upload history storage (already limited to 5 in storage.ts)
       const history = storage.getFileUploadHistory();
       if (history && history.length > 0) {
-        return history;
+        // History is already sorted newest first and limited to 5 in storage
+        return history.slice(0, 5);
       }
 
       // Fallback to old CSV upload state for backward compatibility
@@ -124,8 +154,26 @@ export const FileUploadHistory = ({ onFileClick }: FileUploadHistoryProps) => {
     if (onFileClick) {
       onFileClick(upload);
     } else {
-      // Default behavior - show file details
-      alert(`File: ${upload.fileName}\nUploaded: ${new Date(upload.uploadedAt).toLocaleString()}\nContacts: ${upload.contactsImported}/${upload.totalRows}`);
+      // Enhanced default behavior - show detailed file information
+      const details = [
+        `📁 File: ${upload.fileName}`,
+        `📅 Uploaded: ${new Date(upload.uploadedAt).toLocaleString()}`,
+        `👥 Contacts: ${upload.contactsImported}/${upload.totalRows}`,
+        `📊 Status: ${upload.status.charAt(0).toUpperCase() + upload.status.slice(1)}`,
+        `💾 Size: ${formatFileSize(upload.fileSize)}`,
+        `🔗 Source: ${upload.uploadSource.toUpperCase()}`
+      ];
+      
+      
+      if (upload.metadata?.skippedDuplicates) {
+        details.push(`🔄 Duplicates skipped: ${upload.metadata.skippedDuplicates}`);
+      }
+      
+      if (upload.errorMessage && upload.status === 'failed') {
+        details.push(`❌ Error: ${upload.errorMessage}`);
+      }
+      
+      alert(details.join('\n'));
     }
   };
 
@@ -213,119 +261,123 @@ export const FileUploadHistory = ({ onFileClick }: FileUploadHistoryProps) => {
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <FileText className="w-5 h-5" />
-          <span>File Upload History</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {error && (
-          <Alert variant="destructive">
-            <XCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+    <div className="w-full space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-medium">Upload History</h3>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={fetchUploadHistory}
+          className="text-gray-500 hover:text-gray-700"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </Button>
+      </div>
 
-        {uploads.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p>No file uploads yet</p>
-            <p className="text-sm">Upload a CSV file to see your history here</p>
+      {error && (
+        <Alert variant="destructive">
+          <XCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {uploads.length === 0 ? (
+        <div className="text-center py-8 text-gray-500">
+          <FileText className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+          <p className="text-sm">No uploads yet</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="text-sm text-gray-600 mb-3">
+            Showing {uploads.length} of maximum 5 recent uploads
           </div>
-        ) : (
-          <div className="space-y-3">
-            {uploads.map((upload) => (
-              <div
-                key={upload.id}
-                className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-2">
-                      {getStatusIcon(upload.status)}
-                      <button
-                        onClick={() => handleFileClick(upload)}
-                        className="text-blue-600 hover:text-blue-800 font-medium flex items-center space-x-1"
-                      >
-                        <span>{upload.fileName}</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </button>
-                      {getStatusBadge(upload.status)}
-                    </div>
-
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
-                      <div className="flex items-center space-x-1">
-                        <Calendar className="w-4 h-4" />
-                        <span>{new Date(upload.uploadedAt).toLocaleString()}</span>
-                      </div>
-                      
-                      <div className="flex items-center space-x-1">
-                        <Users className="w-4 h-4" />
-                        <span>{upload.contactsImported} / {upload.totalRows} contacts</span>
-                      </div>
-                      
-                      <div className="flex items-center space-x-1">
-                        <FileText className="w-4 h-4" />
-                        <span>{formatFileSize(upload.fileSize)}</span>
-                      </div>
-                      
-                      <div className="flex items-center space-x-1">
-                        <span className="capitalize">{upload.uploadSource}</span>
-                      </div>
-                    </div>
-
-                    {upload.errorMessage && (
-                      <div className="mt-2 text-sm text-red-600 bg-red-50 p-2 rounded">
-                        Error: {upload.errorMessage}
-                      </div>
-                    )}
-
-                    {upload.metadata?.processingDuration && (
-                      <div className="mt-2 text-xs text-gray-500">
-                        Processing time: {upload.metadata.processingDuration.toFixed(2)}s
-                      </div>
+          {uploads.map((upload, index) => (
+            <div
+              key={upload.id}
+              className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors shadow-sm"
+            >
+              <div className="flex items-center space-x-3 flex-1 min-w-0">
+                {getStatusIcon(upload.status)}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <button
+                      onClick={() => handleFileClick(upload)}
+                      className="text-blue-600 hover:text-blue-800 font-medium text-left truncate block max-w-full"
+                    >
+                      {upload.fileName}
+                    </button>
+                    {upload.status === 'success' && (
+                      <ExternalLink className="w-3 h-3 text-blue-500 cursor-pointer" onClick={() => handleFileClick(upload)} />
                     )}
                   </div>
-
-                  <div className="flex items-center space-x-2 ml-4">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleFileClick(upload)}
-                      className="text-blue-600 hover:text-blue-800"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
+                  
+                  <div className="text-xs text-gray-500 space-y-1">
+                    <div className="flex items-center space-x-4">
+                      <span className="flex items-center space-x-1">
+                        <Calendar className="w-3 h-3" />
+                        <span>{new Date(upload.uploadedAt).toLocaleString()}</span>
+                      </span>
+                      <span className="flex items-center space-x-1">
+                        <Users className="w-3 h-3" />
+                        <span>{upload.contactsImported} new / {upload.totalRows} processed</span>
+                      </span>
+                    </div>
                     
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteUpload(upload.id)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center space-x-4">
+                      <span>{formatFileSize(upload.fileSize)}</span>
+                      {upload.status === 'success' && upload.contactsImported === 0 && upload.totalRows > 0 && (
+                        <span className="text-green-600 text-xs bg-green-50 px-2 py-1 rounded">
+                          All duplicates - file processed successfully
+                        </span>
+                      )}
+                      {upload.errorMessage && upload.status === 'failed' && (
+                        <span className="text-red-600 text-xs bg-red-50 px-2 py-1 rounded truncate max-w-[200px]" title={upload.errorMessage}>
+                          Error: {upload.errorMessage}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
+                
+                <div className="flex flex-col items-end space-y-2">
+                  {getStatusBadge(upload.status)}
+                </div>
               </div>
-            ))}
-          </div>
-        )}
-
-        <div className="pt-4 border-t">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={fetchUploadHistory}
-            className="w-full"
-          >
-            Refresh History
-          </Button>
+              
+              <div className="flex items-center space-x-1 ml-3">
+                {upload.status === 'success' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleFileClick(upload)}
+                    className="h-8 w-8 p-0 text-blue-600 hover:text-blue-800"
+                    title="View file details"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDeleteUpload(upload.id)}
+                  className="h-8 w-8 p-0 text-red-600 hover:text-red-800"
+                  title="Delete upload record"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+            </div>
+          ))}
+          
+          {uploads.length < 5 && (
+            <div className="text-center py-4 text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-lg">
+              {5 - uploads.length} more upload{5 - uploads.length !== 1 ? 's' : ''} can be stored
+            </div>
+          )}
         </div>
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 };
 
