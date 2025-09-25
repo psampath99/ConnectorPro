@@ -1,5 +1,6 @@
 import os
 import base64
+from typing import Tuple
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -62,13 +63,13 @@ class EncryptionService:
             logger.error(f"Error decrypting data: {e}")
             raise
     
-    def encrypt_tokens(self, access_token: str, refresh_token: str) -> tuple[str, str]:
+    def encrypt_tokens(self, access_token: str, refresh_token: str) -> Tuple[str, str]:
         """Encrypt both access and refresh tokens"""
         encrypted_access = self.encrypt(access_token)
         encrypted_refresh = self.encrypt(refresh_token)
         return encrypted_access, encrypted_refresh
     
-    def decrypt_tokens(self, encrypted_access_token: str, encrypted_refresh_token: str) -> tuple[str, str]:
+    def decrypt_tokens(self, encrypted_access_token: str, encrypted_refresh_token: str) -> Tuple[str, str]:
         """Decrypt both access and refresh tokens"""
         access_token = self.decrypt(encrypted_access_token)
         refresh_token = self.decrypt(encrypted_refresh_token)

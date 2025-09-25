@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  connectorpro-backend:
+    build: .
+    image: connectorpro-backend:latest
+    container_name: connectorpro-backend-prod
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.production
+    environment:
+      - APP_ENV=production
+      - PORT=8000
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      - ./logs:/app/logs
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - connectorpro-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # Optional: Add a reverse proxy for production
+  nginx:
+    image: nginx:alpine
+    container_name: connectorpro-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - connectorpro-backend
+    networks:
+      - connectorpro-network
+    restart: unless-stopped
+    profiles:
+      - with-nginx
+
+networks:
+  connectorpro-network:
+    driver: bridge
+    name: connectorpro-network
+
+volumes:
+  logs:
+    driver: local
