@@ -6,17 +6,23 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Conversation, Message, Contact } from '@/types';
 import { storage } from '@/lib/storage';
-import { 
-  Send, 
-  Bot, 
-  User, 
-  MessageSquare, 
-  Calendar, 
+import { imageService, ImageProcessingResult } from '@/services/imageService';
+import { ProcessedImage } from '@/utils/imageUtils';
+import {
+  Send,
+  Bot,
+  User,
+  MessageSquare,
+  Calendar,
   Mail,
   Building2,
   GraduationCap,
   Users as UsersIcon,
-  Star
+  Star,
+  ImageIcon,
+  Paperclip,
+  X,
+  AlertTriangle
 } from 'lucide-react';
 
 interface ChatInterfaceProps {
@@ -29,7 +35,11 @@ export function ChatInterface({ conversation, onNewConversation }: ChatInterface
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [uploadedImages, setUploadedImages] = useState<ProcessedImage[]>([]);
+  const [isProcessingImages, setIsProcessingImages] = useState(false);
+  const [imageErrors, setImageErrors] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setContacts(storage.getContacts());
@@ -170,24 +180,139 @@ What would you like to focus on?`;
     };
   };
 
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsProcessingImages(true);
+    setImageErrors([]);
+
+    try {
+      const results: ImageProcessingResult[] = [];
+      
+      for (const file of Array.from(files)) {
+        const result = await imageService.processImage(file);
+        results.push(result);
+      }
+
+      // Separate successful and failed results
+      const successful = results.filter(r => r.success && r.processedImage);
+      const failed = results.filter(r => !r.success);
+
+      // Add successful images
+      if (successful.length > 0) {
+        const newImages = successful.map(r => r.processedImage!);
+        setUploadedImages(prev => [...prev, ...newImages]);
+      }
+
+      // Show errors for failed uploads
+      if (failed.length > 0) {
+        const errors = failed.map(r => r.error!);
+        setImageErrors(errors);
+      }
+
+      // Show warnings for resized images
+      const warnings = successful
+        .filter(r => r.warnings && r.warnings.length > 0)
+        .flatMap(r => r.warnings!);
+      
+      if (warnings.length > 0) {
+        console.log('Image processing warnings:', warnings);
+      }
+
+    } catch (error) {
+      setImageErrors(['Failed to process images: ' + (error instanceof Error ? error.message : 'Unknown error')]);
+    } finally {
+      setIsProcessingImages(false);
+      // Clear the input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setUploadedImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const clearImageErrors = () => {
+    setImageErrors([]);
+  };
+
   const handleSendMessage = async () => {
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() && uploadedImages.length === 0) return;
+
+    // Prepare message content
+    let messageContent = inputValue;
+    const messageImages = [...uploadedImages];
+
+    // Add image information to message content if images are present
+    if (messageImages.length > 0) {
+      const imageInfo = messageImages.map((img, index) =>
+        `Image ${index + 1}: ${img.dimensions.width}×${img.dimensions.height}${img.wasResized ? ' (resized)' : ''}`
+      ).join(', ');
+      
+      if (messageContent) {
+        messageContent += `\n\n[Attached images: ${imageInfo}]`;
+      } else {
+        messageContent = `[Attached images: ${imageInfo}]`;
+      }
+    }
 
     const userMessage: Message = {
       id: `msg-${Date.now()}-user`,
       role: 'user',
-      content: inputValue,
-      timestamp: new Date()
+      content: messageContent,
+      timestamp: new Date(),
+      metadata: messageImages.length > 0 ? {
+        images: messageImages.map(img => ({
+          dataUrl: img.dataUrl,
+          dimensions: img.dimensions,
+          wasResized: img.wasResized,
+          originalDimensions: img.originalDimensions
+        }))
+      } : undefined
     };
 
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setInputValue('');
+    setUploadedImages([]); // Clear uploaded images after sending
+    setImageErrors([]); // Clear any errors
     setIsTyping(true);
 
-    // Simulate AI thinking time
+    // Simulate AI thinking time with image analysis
     setTimeout(() => {
-      const aiResponse = generateAIResponse(inputValue);
+      let aiResponseContent = '';
+      
+      if (messageImages.length > 0) {
+        aiResponseContent = `I can see you've shared ${messageImages.length} image${messageImages.length > 1 ? 's' : ''} with me. `;
+        
+        // Add information about image processing
+        const resizedCount = messageImages.filter(img => img.wasResized).length;
+        if (resizedCount > 0) {
+          aiResponseContent += `${resizedCount} image${resizedCount > 1 ? 's were' : ' was'} automatically resized to meet API requirements (max 2000px). `;
+        }
+        
+        aiResponseContent += `In a real implementation, I would analyze these images using vision AI capabilities. `;
+        
+        if (inputValue) {
+          aiResponseContent += `Regarding your message: "${inputValue}" - I would provide context-aware responses based on both the text and image content.`;
+        } else {
+          aiResponseContent += `What would you like me to help you with regarding these images?`;
+        }
+      } else {
+        aiResponseContent = generateAIResponse(inputValue).content;
+      }
+
+      const aiResponse: Message = {
+        id: `msg-${Date.now()}`,
+        role: 'assistant',
+        content: aiResponseContent,
+        timestamp: new Date(),
+        metadata: messageImages.length > 0 ? { hasImageAnalysis: true } : undefined
+      };
+
       const updatedMessages = [...newMessages, aiResponse];
       setMessages(updatedMessages);
       setIsTyping(false);
@@ -344,25 +469,131 @@ What would you like to focus on?`;
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Image Upload Errors */}
+      {imageErrors.length > 0 && (
+        <div className="border-t border-gray-200 p-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <div className="flex items-start">
+              <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 mr-2 flex-shrink-0" />
+              <div className="flex-1">
+                <h4 className="text-sm font-medium text-red-800 mb-1">Image Upload Errors</h4>
+                <ul className="text-sm text-red-700 space-y-1">
+                  {imageErrors.map((error, index) => (
+                    <li key={index}>• {error}</li>
+                  ))}
+                </ul>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearImageErrors}
+                className="text-red-600 hover:text-red-800 p-1"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Preview Area */}
+      {uploadedImages.length > 0 && (
+        <div className="border-t border-gray-200 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-medium text-gray-700">
+              Attached Images ({uploadedImages.length})
+            </h4>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setUploadedImages([])}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              Clear All
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {uploadedImages.map((image, index) => (
+              <div key={index} className="relative group">
+                <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                  <img
+                    src={image.dataUrl}
+                    alt={`Upload ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeImage(index)}
+                  className="absolute -top-2 -right-2 w-6 h-6 p-0 bg-red-500 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+                <div className="mt-1 text-xs text-gray-500 text-center">
+                  {image.dimensions.width}×{image.dimensions.height}
+                  {image.wasResized && (
+                    <span className="block text-orange-600">Resized</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Input */}
       <div className="border-t border-gray-200 p-4">
         <div className="flex space-x-2">
+          <div className="flex space-x-1">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleImageUpload}
+              className="hidden"
+              disabled={isProcessingImages}
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isProcessingImages}
+              className="px-2"
+              title="Upload images"
+            >
+              {isProcessingImages ? (
+                <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin" />
+              ) : (
+                <ImageIcon className="w-4 h-4" />
+              )}
+            </Button>
+          </div>
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Ask about networking opportunities, introductions, or draft messages..."
             className="flex-1"
-            disabled={isTyping}
+            disabled={isTyping || isProcessingImages}
           />
-          <Button 
-            onClick={handleSendMessage} 
-            disabled={!inputValue.trim() || isTyping}
+          <Button
+            onClick={handleSendMessage}
+            disabled={(!inputValue.trim() && uploadedImages.length === 0) || isTyping || isProcessingImages}
             className="px-4"
           >
             <Send className="w-4 h-4" />
           </Button>
         </div>
+        {(uploadedImages.length > 0 || isProcessingImages) && (
+          <div className="mt-2 text-xs text-gray-500">
+            {isProcessingImages && "Processing images..."}
+            {uploadedImages.length > 0 && !isProcessingImages &&
+              `${uploadedImages.length} image${uploadedImages.length > 1 ? 's' : ''} ready to send`
+            }
+          </div>
+        )}
       </div>
     </div>
   );

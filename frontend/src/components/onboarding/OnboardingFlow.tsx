@@ -238,56 +238,87 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
 
   const totalSteps = 5;
 
-  // Load persistent state on component mount
+  // Load persistent state and check real connection statuses on component mount
   useEffect(() => {
     console.log('🔍 Loading persistent onboarding state on mount...');
     
-    try {
-      const onboardingData = storage.getOnboardingData();
-      console.log('Onboarding data from storage:', onboardingData);
-      
-      if (onboardingData.csvUploaded && onboardingData.csvImportResult) {
-        console.log('✅ Found persistent CSV upload state - restoring...');
-        console.log('CSV Import Result:', onboardingData.csvImportResult);
+    const loadPersistentState = async () => {
+      try {
+        const onboardingData = storage.getOnboardingData();
+        console.log('Onboarding data from storage:', onboardingData);
         
-        // Create uploaded file from stored data
-        const uploadedFile: UploadedFile = {
-          id: `file-${Date.now()}`,
-          name: onboardingData.csvImportResult.fileName || 'LinkedIn contacts file',
-          size: 0, // Size not stored in old format
-          type: 'text/csv',
-          uploadedAt: onboardingData.csvUploadTimestamp || new Date().toISOString(),
-          contactsImported: onboardingData.csvImportResult.imported || onboardingData.csvImportResult.contactsImported || 0,
-          totalContacts: onboardingData.csvImportResult.total || onboardingData.csvImportResult.contactsImported || 0,
-          storageLocation: 'localStorage'
-        };
-        
-        const existingFiles = storage.getUploadedFiles();
-        
+        if (onboardingData.csvUploaded && onboardingData.csvImportResult) {
+          console.log('✅ Found persistent CSV upload state - restoring...');
+          console.log('CSV Import Result:', onboardingData.csvImportResult);
+          
+          // Create uploaded file from stored data
+          const uploadedFile: UploadedFile = {
+            id: `file-${Date.now()}`,
+            name: onboardingData.csvImportResult.fileName || 'LinkedIn contacts file',
+            size: 0, // Size not stored in old format
+            type: 'text/csv',
+            uploadedAt: onboardingData.csvUploadTimestamp || new Date().toISOString(),
+            contactsImported: onboardingData.csvImportResult.imported || onboardingData.csvImportResult.contactsImported || 0,
+            totalContacts: onboardingData.csvImportResult.total || onboardingData.csvImportResult.contactsImported || 0,
+            storageLocation: 'localStorage'
+          };
+          
+          const existingFiles = storage.getUploadedFiles();
+          
+          setData(prev => ({
+            ...prev,
+            csvUploaded: true,
+            csvImportResult: onboardingData.csvImportResult,
+            uploadedFiles: existingFiles.length > 0 ? existingFiles : [uploadedFile],
+            linkedinConnected: true,
+            // Also restore other onboarding data if available
+            primaryGoal: onboardingData.primaryGoal || prev.primaryGoal,
+            targetCompanies: Array.isArray(onboardingData.targetCompanies) ? onboardingData.targetCompanies : prev.targetCompanies,
+            linkedinProfileUrl: onboardingData.linkedinProfileUrl || prev.linkedinProfileUrl
+          }));
+          console.log('✅ Persistent state loaded successfully');
+        } else {
+          console.log('❌ No persistent CSV upload state found');
+          console.log('csvUploaded:', onboardingData.csvUploaded);
+          console.log('csvImportResult:', onboardingData.csvImportResult);
+        }
+
+        // Check real Gmail connection status
+        try {
+          const gmailStatusResponse = await fetch('http://localhost:8000/api/v1/gmail/status', {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('accessToken') || 'demo-token'}`
+            }
+          });
+
+          if (gmailStatusResponse.ok) {
+            const gmailStatus = await gmailStatusResponse.json();
+            setData(prev => ({
+              ...prev,
+              emailConnected: gmailStatus.status === 'connected'
+            }));
+            console.log('Gmail connection status:', gmailStatus.status);
+          }
+        } catch (error) {
+          console.error('Error checking Gmail status:', error);
+        }
+
+        // Calendar connection is not implemented yet, so keep it false
         setData(prev => ({
           ...prev,
-          csvUploaded: true,
-          csvImportResult: onboardingData.csvImportResult,
-          uploadedFiles: existingFiles.length > 0 ? existingFiles : [uploadedFile],
-          linkedinConnected: true,
-          // Also restore other onboarding data if available
-          primaryGoal: onboardingData.primaryGoal || prev.primaryGoal,
-          targetCompanies: Array.isArray(onboardingData.targetCompanies) ? onboardingData.targetCompanies : prev.targetCompanies,
-          linkedinProfileUrl: onboardingData.linkedinProfileUrl || prev.linkedinProfileUrl,
-          emailConnected: onboardingData.emailConnected || prev.emailConnected,
-          calendarConnected: onboardingData.calendarConnected || prev.calendarConnected
+          calendarConnected: false
         }));
-        console.log('✅ Persistent state loaded successfully');
-      } else {
-        console.log('❌ No persistent CSV upload state found');
-        console.log('csvUploaded:', onboardingData.csvUploaded);
-        console.log('csvImportResult:', onboardingData.csvImportResult);
+
+      } catch (error) {
+        console.error('Error loading persistent state:', error);
+        // Clear potentially corrupted data
+        storage.clearCsvUploadState();
       }
-    } catch (error) {
-      console.error('Error loading persistent state:', error);
-      // Clear potentially corrupted data
-      storage.clearCsvUploadState();
-    }
+    };
+
+    loadPersistentState();
   }, []);
 
   // Detect email provider based on domain
@@ -313,16 +344,46 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     setData(prev => ({ ...prev, primaryGoal: goalId }));
   };
 
-  const handleLinkedInConnect = () => {
-    // In a real app, this would trigger LinkedIn OAuth flow
-    // For now, we'll simulate the connection and load mock data
-    setData(prev => ({ ...prev, linkedinConnected: true }));
-    
-    // Show success message
-    setTimeout(() => {
-      // This would normally process the LinkedIn data
-      console.log('LinkedIn data imported successfully');
-    }, 1000);
+  const handleLinkedInConnect = async () => {
+    try {
+      // Check LinkedIn RapidAPI status
+      const response = await fetch('http://localhost:8000/api/v1/linkedin/rapidapi/status', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken') || 'demo-token'}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to connect to LinkedIn API service');
+      }
+
+      const data = await response.json();
+      
+      if (data.status === 'configured') {
+        // RapidAPI is configured, mark as connected
+        setData(prev => ({ ...prev, linkedinConnected: true }));
+        
+        toast({
+          title: "LinkedIn Connected",
+          description: "LinkedIn API service is configured and ready to use.",
+          variant: "default",
+        });
+        
+        console.log('LinkedIn API service connected successfully');
+      } else {
+        throw new Error(data.message || 'LinkedIn API service not properly configured');
+      }
+      
+    } catch (err) {
+      console.error('LinkedIn connection error:', err);
+      toast({
+        title: "LinkedIn Connection Error",
+        description: err instanceof Error ? err.message : 'Failed to connect to LinkedIn',
+        variant: "destructive",
+      });
+    }
   };
 
   // CSV Upload handlers
@@ -561,16 +622,87 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     window.URL.revokeObjectURL(url);
   };
 
-  const handleEmailConnect = () => {
-    // In a real app, this would trigger email provider OAuth flow
-    setData(prev => ({ ...prev, emailConnected: true }));
-    console.log(`${emailProvider} connected successfully`);
+  const handleEmailConnect = async () => {
+    try {
+      if (emailProvider === 'gmail') {
+        // Check Gmail connection status first
+        const statusResponse = await fetch('http://localhost:8000/api/v1/gmail/status', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('accessToken') || 'demo-token'}`
+          }
+        });
+
+        if (statusResponse.ok) {
+          const statusData = await statusResponse.json();
+          if (statusData.status === 'connected') {
+            setData(prev => ({ ...prev, emailConnected: true }));
+            console.log('Gmail already connected');
+            return;
+          }
+        }
+
+        // Get Gmail authorization URL
+        const authResponse = await fetch('http://localhost:8000/api/v1/gmail/auth-url', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('accessToken') || 'demo-token'}`
+          }
+        });
+
+        if (authResponse.ok) {
+          const authData = await authResponse.json();
+          if (authData.success && authData.auth_url) {
+            // Open authorization URL in new window
+            window.open(authData.auth_url, 'gmail-auth', 'width=500,height=600');
+            // Note: In a real implementation, you'd handle the OAuth callback
+            toast({
+              title: "Gmail Authorization",
+              description: "Please complete the authorization in the popup window. This is a demo - actual OAuth flow would be implemented.",
+              variant: "default",
+            });
+          } else {
+            throw new Error(authData.message || 'Failed to get authorization URL');
+          }
+        } else {
+          throw new Error('Failed to get Gmail authorization URL');
+        }
+      } else {
+        // For other email providers, show a message that they're not yet supported
+        toast({
+          title: "Email Integration",
+          description: `${emailProvider} integration is not yet implemented. Gmail integration is available.`,
+          variant: "default",
+        });
+      }
+    } catch (error) {
+      console.error('Email connection error:', error);
+      toast({
+        title: "Connection Error",
+        description: error instanceof Error ? error.message : 'Failed to connect email',
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleCalendarConnect = () => {
-    // In a real app, this would trigger calendar provider OAuth flow
-    setData(prev => ({ ...prev, calendarConnected: true }));
-    console.log(`Calendar connected successfully`);
+  const handleCalendarConnect = async () => {
+    try {
+      // For now, just show a message that calendar integration is not yet implemented
+      toast({
+        title: "Calendar Integration",
+        description: "Calendar integration is coming soon. This feature will be available in a future update.",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error('Calendar connection error:', error);
+      toast({
+        title: "Connection Error",
+        description: "Failed to connect calendar",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleCompanyToggle = (company: string) => {

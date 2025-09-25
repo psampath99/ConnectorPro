@@ -1,7 +1,26 @@
 # ConnectorPro Release Notes
 
+## ✅ Version 2.0.1 - Gmail and Calendar Integration Confirmed Working
+**Release Date:** September 25, 2025
+**Status:** FULLY OPERATIONAL
+
+### 🎯 Confirmed Working Features
+- **Gmail Integration**: ✅ Fully operational with OAuth2 authentication
+- **Calendar Integration**: ✅ Fully operational with Google Calendar API
+- **Email Filtering**: ✅ Successfully filtering emails from target companies (Apple, Dropbox, Microsoft, Netflix, Snapchat, Stripe, Uber)
+- **CSV Import**: ✅ Successfully processed 1,455 LinkedIn connections
+- **Database**: ✅ MongoDB connection healthy and responsive
+- **API Endpoints**: ✅ All endpoints responding correctly
+
+### 🚀 Server Status
+- **Frontend**: Running on http://localhost:5138/ (React/Vite)
+- **Backend**: Running on http://localhost:8000/ (FastAPI)
+- **Health Check**: {"status":"ok","database":"connected","message":"Service is healthy"}
+
+---
+
 ## 🚀 Version 2.0.0 - Enhanced Message Filtering with Gmail & Calendar Integration
-**Release Date:** January 25, 2025  
+**Release Date:** January 25, 2025
 **Commit:** 3abe238
 
 ### 🎯 Major Features Added

@@ -12,6 +12,7 @@ import Meetings from "./pages/Meetings";
 import Tasks from "./pages/Tasks";
 import Network from "./pages/Network";
 import Settings from "./pages/Settings";
+import CalendarCallback from "./pages/CalendarCallback";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const App = () => (
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/network" element={<Network />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/calendar/callback" element={<CalendarCallback />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
