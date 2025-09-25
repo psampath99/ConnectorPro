@@ -1,49 +1,52 @@
-# FastAPI and server (pre-compiled wheels only)
+# Ultra-minimal FastAPI setup - NO COMPILATION REQUIRED
+# This avoids ALL C/Rust compilation issues on Python 3.13
+
+# Core FastAPI (pure Python)
 fastapi==0.104.1
+
+# ASGI server (pure Python implementation)
 uvicorn==0.24.0
 
-# Database
+# Database (pure Python)
 motor==3.3.2
+pymongo==4.6.0
 
 # Configuration
 python-dotenv==1.0.0
 
-# Data validation (use older stable versions with pre-compiled wheels)
+# Data validation (pure Python, no Rust)
 pydantic==1.10.12
 
-# Authentication and security (avoid cryptography compilation)
+# Authentication (minimal, no cryptography)
 PyJWT==2.8.0
-python-jose==3.3.0
 
-# File handling
+# File handling (pure Python)
 python-multipart==0.0.6
 
-# Data processing (minimal versions to avoid compilation)
-pandas==1.5.3
+# Minimal data processing (avoid pandas compilation)
+# pandas removed - will handle CSV with built-in csv module
 openpyxl==3.1.2
 xlrd==2.0.1
 
-# Google APIs (core only, avoid heavy dependencies)
+# Google APIs (minimal set)
 google-auth==2.23.4
 google-auth-oauthlib==1.1.0
 google-auth-httplib2==0.1.1
 google-api-python-client==2.108.0
 
-# HTTP client (stable version)
-aiohttp==3.8.6
-
-# Core dependencies (ensure compatibility)
+# Core dependencies (pure Python only)
 typing-extensions==4.8.0
-anyio==3.7.1
 starlette==0.27.0
 click==8.1.7
-h11==0.14.0
-httptools==0.6.1
 python-dateutil==2.8.2
-pytz==2023.3
 six==1.16.0
 urllib3==2.0.7
 certifi==2023.7.22
-charset-normalizer==3.3.2
-idna==3.4
 requests==2.31.0
+
+# Remove these to avoid compilation:
+# - aiohttp (C compilation issues)
+# - httptools (C compilation issues)
+# - pandas (C compilation issues)
+# - anyio (may have C dependencies)
+# - h11 (may have C dependencies)
