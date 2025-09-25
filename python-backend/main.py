@@ -14,11 +14,17 @@ from datetime import datetime
 from models import (
     Contact, FileUploadRecord, CSVImportRequest, LinkedInImportRequest,
     ContactsResponse, ImportResponse, FileUploadsResponse, LinkedInStatusResponse,
-    UploadStatus, UploadSource
+    UploadStatus, UploadSource, GmailAuthRequest, GmailConnectionResponse,
+    GmailStatusResponse, GmailEmailsResponse, GmailSearchRequest,
+    GmailSendRequest, GmailSendResponse, GmailConnectionStatus,
+    UserTargetCompany, ToolOriginatedMessage, EnhancedGmailEmail,
+    TargetCompanyRequest, TargetCompanyResponse, EnhancedEmailsResponse
 )
 from database import DatabaseService
 from csv_service_enhanced import CSVService
 from auth import get_current_user, get_current_user_strict, AuthService
+from gmail_service import gmail_service
+from calendar_service import calendar_service
 from pydantic import BaseModel
 
 # Load environment variables
@@ -83,7 +89,7 @@ app = FastAPI(
 )
 
 # Configure CORS
-cors_origins = ["http://localhost:5173", "http://localhost:5138", "http://localhost:5137", "http://localhost:5139", "http://127.0.0.1:5138", "http://127.0.0.1:5173", "http://127.0.0.1:5137", "http://127.0.0.1:5139"]
+cors_origins = ["http://localhost:5173", "http://localhost:5138", "http://localhost:5137", "http://localhost:5139", "http://localhost:5140", "http://127.0.0.1:5138", "http://127.0.0.1:5173", "http://127.0.0.1:5137", "http://127.0.0.1:5139", "http://127.0.0.1:5140"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
@@ -809,6 +815,1026 @@ async def get_current_user_info(current_user: dict = Depends(get_current_user)):
     return {
         "user": current_user
     }
+
+# GMAIL INTEGRATION ENDPOINTS
+
+@app.get("/api/v1/gmail/auth-url", response_model=GmailConnectionResponse)
+async def get_gmail_auth_url(current_user: dict = Depends(get_current_user)):
+    """Get Gmail OAuth2 authorization URL"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        auth_url = gmail_service.get_authorization_url(user_id)
+        
+        return GmailConnectionResponse(
+            success=True,
+            message="Authorization URL generated successfully",
+            auth_url=auth_url
+        )
+    except Exception as e:
+        logger.error(f"Error generating Gmail auth URL: {e}")
+        return GmailConnectionResponse(
+            success=False,
+            message=f"Failed to generate authorization URL: {str(e)}"
+        )
+
+@app.post("/api/v1/gmail/connect", response_model=GmailConnectionResponse)
+async def connect_gmail(
+    auth_request: GmailAuthRequest,
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Connect Gmail account using authorization code"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        
+        # Exchange code for tokens
+        connection = await gmail_service.exchange_code_for_tokens(auth_request, user_id)
+        
+        # Check if connection already exists
+        existing_connection = await db.get_gmail_connection_by_user_id(user_id)
+        
+        if existing_connection:
+            # Update existing connection
+            connection_data = connection.dict(exclude={'id'})
+            updated_connection = await db.update_gmail_connection(user_id, connection_data)
+            connection = updated_connection or connection
+        else:
+            # Create new connection
+            connection = await db.create_gmail_connection(connection)
+        
+        return GmailConnectionResponse(
+            success=True,
+            message=f"Successfully connected Gmail account: {connection.email_address}",
+            connection={
+                "email_address": connection.email_address,
+                "status": connection.status.value,
+                "last_connected": connection.last_connected.isoformat(),
+                "scopes": connection.scopes
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Error connecting Gmail: {e}")
+        return GmailConnectionResponse(
+            success=False,
+            message=f"Failed to connect Gmail: {str(e)}"
+        )
+
+@app.get("/api/v1/gmail/status", response_model=GmailStatusResponse)
+async def get_gmail_status(
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Get Gmail connection status"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        connection = await db.get_gmail_connection_by_user_id(user_id)
+        
+        if not connection:
+            return GmailStatusResponse(
+                status=GmailConnectionStatus.NOT_CONNECTED
+            )
+        
+        # Check for scope mismatch first
+        if not gmail_service._scopes_match(connection.scopes, gmail_service.default_scopes):
+            logger.warning(f"Scope mismatch detected for user {user_id}. Current: {connection.scopes}, Required: {gmail_service.default_scopes}")
+            # Clear the invalid connection
+            await db.delete_gmail_connection(user_id)
+            return GmailStatusResponse(
+                status=GmailConnectionStatus.NOT_CONNECTED,
+                error_message="Scope mismatch detected - please reconnect your Gmail account"
+            )
+        
+        # Check if token is expired
+        if datetime.now() >= connection.token_expires_at:
+            try:
+                # Try to refresh token
+                connection = await gmail_service.refresh_access_token(connection)
+                await db.update_gmail_connection(user_id, connection.dict(exclude={'id'}))
+            except Exception as e:
+                logger.error(f"Failed to refresh Gmail token: {e}")
+                # If refresh fails due to scope mismatch, clear the connection
+                if "scope mismatch" in str(e).lower():
+                    await db.delete_gmail_connection(user_id)
+                    return GmailStatusResponse(
+                        status=GmailConnectionStatus.NOT_CONNECTED,
+                        error_message="Scope mismatch detected - please reconnect your Gmail account"
+                    )
+                connection.status = GmailConnectionStatus.EXPIRED
+                await db.update_gmail_connection(user_id, {"status": GmailConnectionStatus.EXPIRED})
+        
+        return GmailStatusResponse(
+            status=connection.status,
+            email_address=connection.email_address,
+            last_connected=connection.last_connected,
+            scopes=connection.scopes,
+            error_message=connection.error_message
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting Gmail status: {e}")
+        return GmailStatusResponse(
+            status=GmailConnectionStatus.ERROR,
+            error_message=str(e)
+        )
+
+@app.delete("/api/v1/gmail/disconnect")
+async def disconnect_gmail(
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Disconnect Gmail account"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        success = await db.delete_gmail_connection(user_id)
+        
+        if success:
+            return {"message": "Gmail account disconnected successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="No Gmail connection found")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error disconnecting Gmail: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to disconnect Gmail: {str(e)}")
+
+@app.get("/api/v1/gmail/emails", response_model=GmailEmailsResponse)
+async def get_gmail_emails(
+    query: str = "",
+    max_results: int = 10,
+    page_token: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Get emails from Gmail"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        connection = await db.get_gmail_connection_by_user_id(user_id)
+        
+        if not connection:
+            raise HTTPException(status_code=404, detail="Gmail not connected")
+        
+        if connection.status != GmailConnectionStatus.CONNECTED:
+            raise HTTPException(status_code=400, detail="Gmail connection is not active")
+        
+        emails_response = await gmail_service.list_emails(connection, query, max_results, page_token)
+        
+        # Update connection if it was refreshed
+        if connection.updated_at != connection.last_connected:
+            await db.update_gmail_connection(user_id, connection.dict(exclude={'id'}))
+        
+        return emails_response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Error getting Gmail emails: {error_msg}")
+        
+        # Handle scope mismatch errors
+        if "scope mismatch" in error_msg.lower():
+            # Clear the invalid connection
+            await db.delete_gmail_connection(user_id)
+            raise HTTPException(status_code=401, detail="Scope mismatch detected - please reconnect your Gmail account")
+        
+        raise HTTPException(status_code=500, detail=f"Failed to get emails: {error_msg}")
+
+@app.post("/api/v1/gmail/search", response_model=GmailEmailsResponse)
+async def search_gmail_emails(
+    search_request: GmailSearchRequest,
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Search emails in Gmail"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        connection = await db.get_gmail_connection_by_user_id(user_id)
+        
+        if not connection:
+            raise HTTPException(status_code=404, detail="Gmail not connected")
+        
+        if connection.status != GmailConnectionStatus.CONNECTED:
+            raise HTTPException(status_code=400, detail="Gmail connection is not active")
+        
+        emails_response = await gmail_service.list_emails(
+            connection,
+            search_request.query,
+            search_request.max_results or 10,
+            search_request.page_token
+        )
+        
+        return emails_response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Error searching Gmail emails: {error_msg}")
+        
+        # Handle scope mismatch errors
+        if "scope mismatch" in error_msg.lower():
+            # Clear the invalid connection
+            await db.delete_gmail_connection(user_id)
+            raise HTTPException(status_code=401, detail="Scope mismatch detected - please reconnect your Gmail account")
+        
+        raise HTTPException(status_code=500, detail=f"Failed to search emails: {error_msg}")
+
+@app.get("/api/v1/gmail/emails/by-companies", response_model=EnhancedEmailsResponse)
+async def get_emails_by_target_companies(
+    target_companies: Optional[str] = Query(None, description="Comma-separated list of target companies (optional if user has configured companies)"),
+    max_results: int = Query(50, ge=1, le=100),
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Enhanced email filtering with flexible domain matching and tool-originated message support"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        connection = await db.get_gmail_connection_by_user_id(user_id)
+        
+        if not connection:
+            raise HTTPException(status_code=404, detail="Gmail not connected")
+        
+        if connection.status != GmailConnectionStatus.CONNECTED:
+            raise HTTPException(status_code=400, detail="Gmail connection is not active")
+        
+        # Get user's configured target companies
+        user_target_companies = await db.get_target_companies_by_user_id(user_id)
+        
+        # Parse target companies from query parameter or use configured companies
+        companies = []
+        if target_companies:
+            companies = [company.strip() for company in target_companies.split(',')]
+        elif user_target_companies:
+            companies = [tc.company_name for tc in user_target_companies]
+        else:
+            # Fallback to default companies for backward compatibility
+            companies = ["Meta", "Google", "Microsoft", "Apple", "Amazon", "Stripe"]
+        
+        # Build company domain mapping using flexible matching
+        company_domain_map = {}
+        domain_queries = []
+        
+        for company in companies:
+            # Check if user has configured explicit domains for this company
+            user_company = next((tc for tc in user_target_companies if tc.company_name.lower() == company.lower()), None)
+            
+            if user_company and user_company.company_domains:
+                # Use user-configured domains
+                company_domains = user_company.company_domains
+            else:
+                # Use default domain mapping
+                company_domains = gmail_service.get_default_company_domains(company)
+            
+            company_domain_map[company] = company_domains
+            
+            # Add search queries for each domain
+            for domain in company_domains:
+                domain_queries.extend([
+                    f"from:@{domain}",
+                    f"from:{domain}"
+                ])
+        
+        # Combine queries with OR operator
+        search_query = " OR ".join(domain_queries) if domain_queries else ""
+        
+        logger.info(f"Enhanced Gmail search for target companies: {companies}")
+        logger.info(f"Search query: {search_query}")
+        logger.info(f"Company domain mapping: {company_domain_map}")
+        
+        # Get emails from Gmail
+        emails_response = await gmail_service.list_emails(
+            connection,
+            search_query,
+            max_results,
+            None
+        )
+        
+        # Get tool-originated messages for this user
+        message_ids = [email.id for email in emails_response.emails]
+        tool_originated_map = await db.bulk_check_tool_originated_messages(user_id, message_ids)
+        
+        # Enhanced filtering with OR logic: (company match OR tool-initiated)
+        emails_by_company = {}
+        tool_originated_emails = []
+        all_filtered_emails = []
+        
+        for email in emails_response.emails:
+            # Check if message is tool-originated
+            is_tool_originated = email.id in tool_originated_map
+            tool_message = tool_originated_map.get(email.id)
+            
+            # Extract domain from sender email
+            sender_email = email.sender
+            if '<' in sender_email:
+                sender_email = sender_email.split('<')[1].split('>')[0]
+            
+            # Check for company match using flexible domain matching
+            matched_company = None
+            for company, company_domains in company_domain_map.items():
+                # Try exact domain match first
+                domain = sender_email.split('@')[-1].lower() if '@' in sender_email else ''
+                if any(domain == company_domain.lower() for company_domain in company_domains):
+                    matched_company = company
+                    break
+                
+                # Try flexible domain matching
+                if gmail_service.flexible_domain_match(sender_email, company):
+                    matched_company = company
+                    break
+            
+            # Apply OR logic: include if (company match OR tool-initiated)
+            should_include = matched_company is not None or is_tool_originated
+            
+            if should_include:
+                # Create enhanced email object
+                enhanced_email = EnhancedGmailEmail(
+                    **email.dict(),
+                    initiated_by_tool=is_tool_originated,
+                    matched_company=matched_company,
+                    tool_name=tool_message.tool_name if tool_message else None
+                )
+                
+                all_filtered_emails.append(enhanced_email)
+                
+                if is_tool_originated:
+                    tool_originated_emails.append(enhanced_email)
+                    logger.info(f"✅ Tool-originated email included: {email.id} (tool: {tool_message.tool_name if tool_message else 'Unknown'})")
+                
+                if matched_company:
+                    if matched_company not in emails_by_company:
+                        emails_by_company[matched_company] = []
+                    emails_by_company[matched_company].append(enhanced_email)
+                    logger.info(f"✅ Email from {sender_email} matched to target company: {matched_company}")
+            else:
+                logger.info(f"❌ Email from {sender_email} filtered out (no company match and not tool-originated)")
+        
+        logger.info(f"Enhanced filtering results: {len(all_filtered_emails)} emails from {len(emails_response.emails)} total")
+        logger.info(f"Tool-originated emails: {len(tool_originated_emails)}")
+        logger.info(f"Company-matched emails: {sum(len(emails) for emails in emails_by_company.values())}")
+        
+        return EnhancedEmailsResponse(
+            success=True,
+            emails_by_company=emails_by_company,
+            tool_originated_emails=tool_originated_emails,
+            total_emails=len(all_filtered_emails),
+            companies_found=list(emails_by_company.keys()),
+            filtered_count=len(all_filtered_emails),
+            original_count=len(emails_response.emails),
+            target_companies=companies
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Error in enhanced email filtering: {error_msg}")
+        
+        # Handle scope mismatch errors
+        if "scope mismatch" in error_msg.lower():
+            await db.delete_gmail_connection(user_id)
+            raise HTTPException(status_code=401, detail="Scope mismatch detected - please reconnect your Gmail account")
+        
+        raise HTTPException(status_code=500, detail=f"Failed to get emails by companies: {error_msg}")
+
+@app.post("/api/v1/gmail/send", response_model=GmailSendResponse)
+async def send_gmail_email(
+    send_request: GmailSendRequest,
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Send email via Gmail and automatically mark as tool-originated"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        connection = await db.get_gmail_connection_by_user_id(user_id)
+        
+        if not connection:
+            raise HTTPException(status_code=404, detail="Gmail not connected")
+        
+        if connection.status != GmailConnectionStatus.CONNECTED:
+            raise HTTPException(status_code=400, detail="Gmail connection is not active")
+        
+        # Check if user has send permission
+        if "https://www.googleapis.com/auth/gmail.send" not in connection.scopes:
+            raise HTTPException(status_code=403, detail="Send permission not granted")
+        
+        send_response = await gmail_service.send_email(connection, send_request)
+        
+        # If email was sent successfully, mark it as tool-originated
+        if send_response.success and send_response.message_id:
+            try:
+                tool_message = ToolOriginatedMessage(
+                    user_id=user_id,
+                    message_id=send_response.message_id,
+                    thread_id=send_response.thread_id or send_response.message_id,
+                    tool_name="ConnectorPro"
+                )
+                await db.create_tool_originated_message(tool_message)
+                logger.info(f"Marked sent email as tool-originated: {send_response.message_id}")
+            except Exception as e:
+                logger.warning(f"Failed to mark sent email as tool-originated: {e}")
+                # Don't fail the send operation if marking fails
+        
+        return send_response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Error sending Gmail email: {error_msg}")
+        
+        # Handle scope mismatch errors
+        if "scope mismatch" in error_msg.lower():
+            # Clear the invalid connection
+            await db.delete_gmail_connection(user_id)
+            return GmailSendResponse(
+                success=False,
+                message="Scope mismatch detected - please reconnect your Gmail account"
+            )
+        
+        return GmailSendResponse(
+            success=False,
+            message=f"Failed to send email: {error_msg}"
+        )
+
+@app.get("/api/v1/gmail/callback")
+async def gmail_oauth_callback(
+    code: str = Query(...),
+    state: str = Query(...),
+    error: Optional[str] = Query(None),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Handle Gmail OAuth2 callback"""
+    try:
+        if error:
+            logger.error(f"OAuth error: {error}")
+            return {
+                "success": False,
+                "message": f"OAuth authorization failed: {error}",
+                "redirect_url": "http://localhost:5140/settings?gmail_error=oauth_denied"
+            }
+        
+        if not code or not state:
+            raise HTTPException(status_code=400, detail="Missing authorization code or state")
+        
+        # State contains the user_id
+        user_id = state
+        
+        # Create auth request object
+        auth_request = GmailAuthRequest(
+            authorization_code=code,
+            redirect_uri=os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/v1/gmail/callback")
+        )
+        
+        # Exchange code for tokens
+        connection = await gmail_service.exchange_code_for_tokens(auth_request, user_id)
+        
+        # Check if connection already exists
+        existing_connection = await db.get_gmail_connection_by_user_id(user_id)
+        
+        if existing_connection:
+            # Update existing connection
+            connection_data = connection.dict(exclude={'id'})
+            updated_connection = await db.update_gmail_connection(user_id, connection_data)
+            connection = updated_connection or connection
+        else:
+            # Create new connection
+            connection = await db.create_gmail_connection(connection)
+        
+        logger.info(f"Successfully connected Gmail for user {user_id}: {connection.email_address}")
+        
+        # Return JSON response for the callback page to handle
+        return {
+            "success": True,
+            "message": f"Successfully connected Gmail account: {connection.email_address}",
+            "redirect_url": "http://localhost:5140/settings?gmail_success=connected",
+            "connection": {
+                "email_address": connection.email_address,
+                "status": connection.status.value,
+                "last_connected": connection.last_connected.isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in Gmail OAuth callback: {e}")
+        return {
+            "success": False,
+            "message": f"Failed to connect Gmail: {str(e)}",
+            "redirect_url": "http://localhost:5140/settings?gmail_error=connection_failed"
+        }
+
+@app.post("/api/v1/gmail/clear-invalid-tokens")
+async def clear_invalid_gmail_tokens(
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Clear Gmail connections with invalid or mismatched scopes"""
+    try:
+        cleared_count = await gmail_service.clear_invalid_tokens(db)
+        return {
+            "success": True,
+            "message": f"Cleared {cleared_count} invalid Gmail connections",
+            "cleared_count": cleared_count
+        }
+    except Exception as e:
+        logger.error(f"Error clearing invalid tokens: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to clear invalid tokens: {str(e)}")
+
+# TARGET COMPANIES MANAGEMENT ENDPOINTS
+
+@app.get("/api/v1/target-companies", response_model=TargetCompanyResponse)
+async def get_target_companies(
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Get user's configured target companies"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        companies = await db.get_target_companies_by_user_id(user_id)
+        
+        return TargetCompanyResponse(
+            success=True,
+            message=f"Retrieved {len(companies)} target companies",
+            companies=companies
+        )
+    except Exception as e:
+        logger.error(f"Error getting target companies: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get target companies: {str(e)}")
+
+@app.post("/api/v1/target-companies", response_model=TargetCompanyResponse)
+async def add_target_company(
+    request: TargetCompanyRequest,
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Add a new target company for the user"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        
+        # Check if company already exists for this user
+        existing_companies = await db.get_target_companies_by_user_id(user_id)
+        if any(tc.company_name.lower() == request.company_name.lower() for tc in existing_companies):
+            raise HTTPException(status_code=409, detail="Target company already exists")
+        
+        # Create new target company
+        target_company = UserTargetCompany(
+            user_id=user_id,
+            company_name=request.company_name,
+            company_domains=request.company_domains or []
+        )
+        
+        created_company = await db.create_target_company(target_company)
+        
+        return TargetCompanyResponse(
+            success=True,
+            message=f"Successfully added target company: {request.company_name}",
+            companies=[created_company]
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding target company: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to add target company: {str(e)}")
+
+@app.put("/api/v1/target-companies/{company_id}", response_model=TargetCompanyResponse)
+async def update_target_company(
+    company_id: str,
+    request: TargetCompanyRequest,
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Update a target company"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        
+        # Verify the company belongs to the user
+        existing_companies = await db.get_target_companies_by_user_id(user_id)
+        target_company = next((tc for tc in existing_companies if tc.id == company_id), None)
+        
+        if not target_company:
+            raise HTTPException(status_code=404, detail="Target company not found")
+        
+        # Update the company
+        update_data = {
+            "company_name": request.company_name,
+            "company_domains": request.company_domains or [],
+            "updated_at": datetime.now()
+        }
+        
+        updated_company = await db.update_target_company(company_id, update_data)
+        
+        if not updated_company:
+            raise HTTPException(status_code=404, detail="Target company not found")
+        
+        return TargetCompanyResponse(
+            success=True,
+            message=f"Successfully updated target company: {request.company_name}",
+            companies=[updated_company]
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating target company: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update target company: {str(e)}")
+
+@app.delete("/api/v1/target-companies/{company_id}")
+async def delete_target_company(
+    company_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Delete a target company"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        
+        # Verify the company belongs to the user
+        existing_companies = await db.get_target_companies_by_user_id(user_id)
+        target_company = next((tc for tc in existing_companies if tc.id == company_id), None)
+        
+        if not target_company:
+            raise HTTPException(status_code=404, detail="Target company not found")
+        
+        success = await db.delete_target_company(company_id)
+        
+        if not success:
+            raise HTTPException(status_code=404, detail="Target company not found")
+        
+        return {"message": f"Successfully deleted target company: {target_company.company_name}"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting target company: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete target company: {str(e)}")
+
+@app.post("/api/v1/target-companies/bulk")
+async def set_target_companies_bulk(
+    companies: List[TargetCompanyRequest],
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Set target companies in bulk (replaces all existing companies)"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        
+        # Delete all existing target companies for the user
+        await db.delete_target_companies_by_user_id(user_id)
+        
+        # Create new target companies
+        created_companies = []
+        for company_request in companies:
+            target_company = UserTargetCompany(
+                user_id=user_id,
+                company_name=company_request.company_name,
+                company_domains=company_request.company_domains or []
+            )
+            created_company = await db.create_target_company(target_company)
+            created_companies.append(created_company)
+        
+        return TargetCompanyResponse(
+            success=True,
+            message=f"Successfully set {len(created_companies)} target companies",
+            companies=created_companies
+        )
+    except Exception as e:
+        logger.error(f"Error setting target companies in bulk: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to set target companies: {str(e)}")
+
+# TOOL-ORIGINATED MESSAGES ENDPOINTS
+
+@app.post("/api/v1/gmail/mark-tool-originated")
+async def mark_message_as_tool_originated(
+    message_id: str,
+    thread_id: str,
+    tool_name: str = "ConnectorPro",
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Mark a Gmail message as tool-originated"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        
+        # Check if already marked
+        existing = await db.is_message_tool_originated(user_id, message_id)
+        if existing:
+            return {"message": "Message already marked as tool-originated", "existing": True}
+        
+        # Create tool-originated message record
+        tool_message = ToolOriginatedMessage(
+            user_id=user_id,
+            message_id=message_id,
+            thread_id=thread_id,
+            tool_name=tool_name
+        )
+        
+        created_message = await db.create_tool_originated_message(tool_message)
+        
+        return {
+            "success": True,
+            "message": f"Successfully marked message as tool-originated",
+            "tool_message": created_message.dict()
+        }
+    except Exception as e:
+        logger.error(f"Error marking message as tool-originated: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to mark message: {str(e)}")
+
+@app.get("/api/v1/gmail/tool-originated-messages")
+async def get_tool_originated_messages(
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Get all tool-originated messages for the user"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        messages = await db.get_tool_originated_messages_by_user_id(user_id)
+        
+        return {
+            "success": True,
+            "messages": [msg.dict() for msg in messages],
+            "total": len(messages)
+        }
+    except Exception as e:
+        logger.error(f"Error getting tool-originated messages: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get tool-originated messages: {str(e)}")
+
+# GOOGLE CALENDAR INTEGRATION ENDPOINTS
+
+@app.get("/api/v1/calendar/auth-url", response_model=GmailConnectionResponse)
+async def get_calendar_auth_url(current_user: dict = Depends(get_current_user)):
+    """Get Google Calendar OAuth2 authorization URL"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        auth_url = calendar_service.get_authorization_url(user_id)
+        
+        return GmailConnectionResponse(
+            success=True,
+            message="Calendar authorization URL generated successfully",
+            auth_url=auth_url
+        )
+    except Exception as e:
+        logger.error(f"Error generating Calendar auth URL: {e}")
+        return GmailConnectionResponse(
+            success=False,
+            message=f"Failed to generate authorization URL: {str(e)}"
+        )
+
+@app.post("/api/v1/calendar/connect", response_model=GmailConnectionResponse)
+async def connect_calendar(
+    auth_request: GmailAuthRequest,
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Connect Google Calendar account using authorization code"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        
+        # Exchange code for tokens
+        connection = await calendar_service.exchange_code_for_tokens(auth_request, user_id)
+        
+        # Check if connection already exists
+        existing_connection = await db.get_calendar_connection_by_user_id(user_id)
+        
+        if existing_connection:
+            # Update existing connection
+            connection_data = connection.dict(exclude={'id'})
+            updated_connection = await db.update_calendar_connection(user_id, connection_data)
+            connection = updated_connection or connection
+        else:
+            # Create new connection
+            connection = await db.create_calendar_connection(connection)
+        
+        logger.info(f"Successfully connected Calendar for user {user_id}: {connection.email_address}")
+        
+        return GmailConnectionResponse(
+            success=True,
+            message=f"Successfully connected Google Calendar: {connection.email_address}",
+            connection={
+                "email_address": connection.email_address,
+                "status": connection.status.value,
+                "last_connected": connection.last_connected.isoformat(),
+                "scopes": connection.scopes
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Error connecting Calendar: {e}")
+        return GmailConnectionResponse(
+            success=False,
+            message=f"Failed to connect Calendar: {str(e)}"
+        )
+
+@app.get("/api/v1/calendar/status", response_model=GmailStatusResponse)
+async def get_calendar_status(
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Get Google Calendar connection status"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        connection = await db.get_calendar_connection_by_user_id(user_id)
+        
+        if not connection:
+            return GmailStatusResponse(
+                status=GmailConnectionStatus.NOT_CONNECTED
+            )
+        
+        # Check for scope mismatch first
+        if not calendar_service._scopes_match(connection.scopes, calendar_service.default_scopes):
+            logger.warning(f"Calendar scope mismatch detected for user {user_id}. Current: {connection.scopes}, Required: {calendar_service.default_scopes}")
+            # Clear the invalid connection
+            await db.delete_calendar_connection(user_id)
+            return GmailStatusResponse(
+                status=GmailConnectionStatus.NOT_CONNECTED,
+                error_message="Scope mismatch detected - please reconnect your Google Calendar"
+            )
+        
+        # Check if token is expired
+        if datetime.now() >= connection.token_expires_at:
+            try:
+                # Try to refresh token
+                connection = await calendar_service.refresh_access_token(connection)
+                await db.update_calendar_connection(user_id, connection.dict(exclude={'id'}))
+            except Exception as e:
+                logger.error(f"Failed to refresh Calendar token: {e}")
+                if "scope mismatch" in str(e).lower():
+                    await db.delete_calendar_connection(user_id)
+                    return GmailStatusResponse(
+                        status=GmailConnectionStatus.NOT_CONNECTED,
+                        error_message="Scope mismatch detected - please reconnect your Google Calendar"
+                    )
+                connection.status = GmailConnectionStatus.EXPIRED
+                await db.update_calendar_connection(user_id, {"status": GmailConnectionStatus.EXPIRED})
+        
+        return GmailStatusResponse(
+            status=connection.status,
+            email_address=connection.email_address,
+            last_connected=connection.last_connected,
+            scopes=connection.scopes,
+            error_message=connection.error_message
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting Calendar status: {e}")
+        return GmailStatusResponse(
+            status=GmailConnectionStatus.ERROR,
+            error_message=str(e)
+        )
+
+@app.delete("/api/v1/calendar/disconnect")
+async def disconnect_calendar(
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Disconnect Google Calendar account"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        success = await db.delete_calendar_connection(user_id)
+        
+        if success:
+            return {"message": "Google Calendar disconnected successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="No Calendar connection found")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error disconnecting Calendar: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to disconnect Calendar: {str(e)}")
+
+@app.get("/api/v1/calendar/callback")
+async def calendar_oauth_callback(
+    code: str = Query(...),
+    state: str = Query(...),
+    error: Optional[str] = Query(None),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Handle Google Calendar OAuth2 callback"""
+    try:
+        if error:
+            logger.error(f"Calendar OAuth error: {error}")
+            return {
+                "success": False,
+                "message": f"Calendar authorization failed: {error}",
+                "redirect_url": "http://localhost:5137/settings?calendar_error=oauth_denied"
+            }
+        
+        if not code or not state:
+            raise HTTPException(status_code=400, detail="Missing authorization code or state")
+        
+        # State contains the user_id
+        user_id = state
+        
+        # Create auth request object
+        auth_request = GmailAuthRequest(
+            authorization_code=code,
+            redirect_uri=os.getenv("GOOGLE_CALENDAR_REDIRECT_URI", "http://localhost:8000/api/v1/calendar/callback")
+        )
+        
+        # Exchange code for tokens
+        connection = await calendar_service.exchange_code_for_tokens(auth_request, user_id)
+        
+        # Check if connection already exists
+        existing_connection = await db.get_calendar_connection_by_user_id(user_id)
+        
+        if existing_connection:
+            # Update existing connection
+            connection_data = connection.dict(exclude={'id'})
+            updated_connection = await db.update_calendar_connection(user_id, connection_data)
+            connection = updated_connection or connection
+        else:
+            # Create new connection
+            connection = await db.create_calendar_connection(connection)
+        
+        logger.info(f"Successfully connected Calendar for user {user_id}: {connection.email_address}")
+        
+        # Return JSON response for the callback page to handle
+        return {
+            "success": True,
+            "message": f"Successfully connected Google Calendar: {connection.email_address}",
+            "redirect_url": "http://localhost:5137/settings?calendar_success=connected",
+            "connection": {
+                "email_address": connection.email_address,
+                "status": connection.status.value,
+                "last_connected": connection.last_connected.isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in Calendar OAuth callback: {e}")
+        return {
+            "success": False,
+            "message": f"Failed to connect Calendar: {str(e)}",
+            "redirect_url": "http://localhost:5137/settings?calendar_error=connection_failed"
+        }
+
+@app.get("/api/v1/calendar/calendars")
+async def get_calendars(
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Get user's calendars"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        connection = await db.get_calendar_connection_by_user_id(user_id)
+        
+        if not connection:
+            raise HTTPException(status_code=404, detail="Calendar not connected")
+        
+        if connection.status != GmailConnectionStatus.CONNECTED:
+            raise HTTPException(status_code=400, detail="Calendar connection is not active")
+        
+        calendars = await calendar_service.list_calendars(connection)
+        
+        return {"calendars": calendars}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting calendars: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get calendars: {str(e)}")
+
+@app.post("/api/v1/calendar/events")
+async def create_calendar_event(
+    event_data: dict,
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Create a calendar event"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        connection = await db.get_calendar_connection_by_user_id(user_id)
+        
+        if not connection:
+            raise HTTPException(status_code=404, detail="Calendar not connected")
+        
+        if connection.status != GmailConnectionStatus.CONNECTED:
+            raise HTTPException(status_code=400, detail="Calendar connection is not active")
+        
+        event = await calendar_service.create_event(connection, event_data)
+        
+        return {"success": True, "event": event}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating calendar event: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create event: {str(e)}")
+
+@app.post("/api/v1/calendar/clear-invalid-tokens")
+async def clear_invalid_calendar_tokens(
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Clear Calendar connections with invalid or mismatched scopes"""
+    try:
+        cleared_count = await calendar_service.clear_invalid_tokens(db)
+        return {
+            "success": True,
+            "message": f"Cleared {cleared_count} invalid Calendar connections",
+            "cleared_count": cleared_count
+        }
+    except Exception as e:
+        logger.error(f"Error clearing invalid calendar tokens: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to clear invalid tokens: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

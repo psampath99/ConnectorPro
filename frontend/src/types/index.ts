@@ -147,3 +147,82 @@ export interface Activity {
   };
   timestamp: Date;
 }
+
+// Enhanced Gmail API Response Types
+export interface EnhancedGmailResponse {
+  emails_by_company: { [company: string]: GmailEmail[] };
+  tool_originated_emails: GmailEmail[];
+  metrics: {
+    total_emails: number;
+    company_matched_emails: number;
+    tool_originated_emails: number;
+    companies_with_emails: string[];
+  };
+  success: boolean;
+  message?: string;
+}
+
+// Enhanced Gmail Email with tool-originated tracking
+export interface GmailEmail {
+  id: string;
+  subject: string;
+  sender: string;
+  recipient: string;
+  date: string;
+  snippet: string;
+  is_read: boolean;
+  is_important: boolean;
+  has_attachments: boolean;
+  body_text?: string;
+  body_html?: string;
+  // Enhanced fields for tool-originated tracking
+  is_tool_originated?: boolean;
+  tool_metadata?: {
+    initiated_by_tool: boolean;
+    tool_session_id?: string;
+    original_request?: string;
+    created_at?: string;
+  };
+  // Company matching information
+  matched_company?: string;
+  domain_matched?: string;
+}
+
+// Target Company Management Types
+export interface TargetCompany {
+  name: string;
+  domains: string[];
+  is_active: boolean;
+  added_at: Date;
+  notes?: string;
+}
+
+export interface TargetCompanyStats {
+  company: string;
+  total_emails: number;
+  tool_originated_emails: number;
+  company_matched_emails: number;
+  last_email_date?: string;
+  response_rate?: number;
+}
+
+// Enhanced Message Filtering Types
+export interface MessageFilter {
+  status?: 'all' | 'draft' | 'sent' | 'archived';
+  company?: string;
+  message_type?: 'all' | 'tool_originated' | 'company_matched';
+  date_range?: {
+    start: Date;
+    end: Date;
+  };
+  search_query?: string;
+}
+
+// Tool-Originated Message Badge Types
+export interface ToolOriginatedBadge {
+  type: 'tool_initiated' | 'ai_generated' | 'automated';
+  label: string;
+  color: 'blue' | 'green' | 'purple' | 'orange';
+  icon?: string;
+  tooltip?: string;
+}

@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { LinkedInIntegration } from '@/components/integrations/LinkedInIntegration';
 import { CSVImport } from '@/components/integrations/CSVImport';
 import { FileUploadHistory } from '@/components/integrations/FileUploadHistory';
+import { GmailIntegration } from '@/components/integrations/GmailIntegration';
+import { CalendarIntegration } from '@/components/integrations/CalendarIntegration';
 import { storage } from '@/lib/storage';
 import { User } from '@/types';
 import {
@@ -23,7 +25,9 @@ import {
   Lightbulb,
   Link,
   Info,
-  Edit3
+  Edit3,
+  Mail,
+  Calendar
 } from 'lucide-react';
 
 const commonCompanies = [
@@ -50,6 +54,18 @@ const Settings = () => {
     totalActiveContacts: 0,
     latestUpload: null
   });
+  const [gmailStatus, setGmailStatus] = useState<{
+    status: string;
+    email_address?: string;
+    last_connected?: string;
+    error_message?: string;
+  } | null>(null);
+  const [calendarStatus, setCalendarStatus] = useState<{
+    status: string;
+    email_address?: string;
+    last_connected?: string;
+    error_message?: string;
+  } | null>(null);
 
   useEffect(() => {
     const userData = storage.getUser();
@@ -69,8 +85,10 @@ const Settings = () => {
       }
     }
 
-    // Load contact stats
+    // Load contact stats and integration statuses
     fetchContactStats();
+    fetchGmailStatus();
+    fetchCalendarStatus();
   }, []);
 
   // Fetch contact stats from backend
@@ -86,10 +104,50 @@ const Settings = () => {
     }
   };
 
-  // Refresh contact stats when refresh trigger changes
+  // Fetch Gmail status from backend
+  const fetchGmailStatus = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/v1/gmail/status', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken') || 'demo-token'}`
+        }
+      });
+      if (response.ok) {
+        const status = await response.json();
+        setGmailStatus(status);
+      }
+    } catch (error) {
+      console.error('Error fetching Gmail status:', error);
+    }
+  };
+
+  // Fetch Calendar status from backend
+  const fetchCalendarStatus = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/v1/calendar/status', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken') || 'demo-token'}`
+        }
+      });
+      if (response.ok) {
+        const status = await response.json();
+        setCalendarStatus(status);
+      }
+    } catch (error) {
+      console.error('Error fetching Calendar status:', error);
+    }
+  };
+
+  // Refresh contact stats and Gmail status when refresh trigger changes
   useEffect(() => {
     if (refreshTrigger > 0) {
       fetchContactStats();
+      fetchGmailStatus();
+      fetchCalendarStatus();
     }
   }, [refreshTrigger]);
 
@@ -526,6 +584,68 @@ const Settings = () => {
               </CardContent>
             </Card>
 
+            {/* Gmail Integration */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Mail className="w-5 h-5" />
+                  <span>Gmail Integration</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="bg-blue-50 rounded-lg p-4 mb-6">
+                  <div className="flex items-start space-x-2">
+                    <Lightbulb className="w-5 h-5 text-blue-600 mt-0.5" />
+                    <div>
+                      <h4 className="font-medium text-blue-900 mb-1">Connect Your Gmail Account</h4>
+                      <p className="text-sm text-blue-800">
+                        Connect Gmail to send personalized introduction requests and follow-up emails directly from ConnectorPro.
+                        Your emails will be sent from your own Gmail account with full tracking and organization.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <GmailIntegration
+                  onConnectionChange={() => {
+                    // Refresh Gmail status when connection changes
+                    fetchGmailStatus();
+                  }}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Google Calendar Integration */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Calendar className="w-5 h-5" />
+                  <span>Google Calendar Integration</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="bg-blue-50 rounded-lg p-4 mb-6">
+                  <div className="flex items-start space-x-2">
+                    <Lightbulb className="w-5 h-5 text-blue-600 mt-0.5" />
+                    <div>
+                      <h4 className="font-medium text-blue-900 mb-1">Connect Your Google Calendar</h4>
+                      <p className="text-sm text-blue-800">
+                        Connect Google Calendar to schedule meetings, create events, and manage your calendar directly from ConnectorPro.
+                        Perfect for scheduling networking meetings and follow-ups.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <CalendarIntegration
+                  onConnectionChange={() => {
+                    // Refresh Calendar status when connection changes
+                    fetchCalendarStatus();
+                  }}
+                />
+              </CardContent>
+            </Card>
+
             {/* Connected Integrations */}
             <Card>
               <CardHeader>
@@ -615,39 +735,105 @@ const Settings = () => {
                   </div>
 
                   {/* Gmail Integration */}
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className={`flex items-center justify-between p-4 rounded-lg border ${
+                    gmailStatus?.status === 'connected'
+                      ? 'bg-green-50 border-green-200'
+                      : 'bg-gray-50 border-gray-200'
+                  }`}>
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gray-400 rounded-lg flex items-center justify-center">
-                        <CheckCircle className="w-5 h-5 text-white" />
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        gmailStatus?.status === 'connected'
+                          ? 'bg-red-600'
+                          : 'bg-gray-400'
+                      }`}>
+                        <Mail className="w-5 h-5 text-white" />
                       </div>
                       <div>
                         <h3 className="font-medium text-gray-900">Gmail</h3>
                         <p className="text-sm text-gray-700">Send introduction requests and follow-ups</p>
-                        <p className="text-xs text-gray-500 mt-1">Last connected: Never</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {gmailStatus?.status === 'connected' && gmailStatus.email_address
+                            ? `Connected: ${gmailStatus.email_address}`
+                            : gmailStatus?.status === 'connected' && gmailStatus.last_connected
+                            ? `Last connected: ${new Date(gmailStatus.last_connected).toLocaleString()}`
+                            : 'Last connected: Never'
+                          }
+                        </p>
                       </div>
                     </div>
-                    <Badge className="bg-gray-100 text-gray-600">
-                      <X className="w-3 h-3 mr-1" />
-                      Not Connected
-                    </Badge>
+                    <div className="text-right">
+                      <Badge className={
+                        gmailStatus?.status === 'connected'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-600'
+                      }>
+                        {gmailStatus?.status === 'connected' ? (
+                          <>
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Connected
+                          </>
+                        ) : (
+                          <>
+                            <X className="w-3 h-3 mr-1" />
+                            Not Connected
+                          </>
+                        )}
+                      </Badge>
+                      {gmailStatus?.error_message && (
+                        <p className="text-xs text-red-500 mt-1">{gmailStatus.error_message}</p>
+                      )}
+                    </div>
                   </div>
 
                   {/* Google Calendar Integration */}
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className={`flex items-center justify-between p-4 rounded-lg border ${
+                    calendarStatus?.status === 'connected'
+                      ? 'bg-green-50 border-green-200'
+                      : 'bg-gray-50 border-gray-200'
+                  }`}>
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gray-400 rounded-lg flex items-center justify-center">
-                        <CheckCircle className="w-5 h-5 text-white" />
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        calendarStatus?.status === 'connected'
+                          ? 'bg-blue-600'
+                          : 'bg-gray-400'
+                      }`}>
+                        <Calendar className="w-5 h-5 text-white" />
                       </div>
                       <div>
                         <h3 className="font-medium text-gray-900">Google Calendar</h3>
-                        <p className="text-sm text-gray-700">Schedule meetings with automatic video links</p>
-                        <p className="text-xs text-gray-500 mt-1">Last connected: Never</p>
+                        <p className="text-sm text-gray-700">Schedule meetings and manage events</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {calendarStatus?.status === 'connected' && calendarStatus.email_address
+                            ? `Connected: ${calendarStatus.email_address}`
+                            : calendarStatus?.status === 'connected' && calendarStatus.last_connected
+                            ? `Last connected: ${new Date(calendarStatus.last_connected).toLocaleString()}`
+                            : 'Last connected: Never'
+                          }
+                        </p>
                       </div>
                     </div>
-                    <Badge className="bg-gray-100 text-gray-600">
-                      <X className="w-3 h-3 mr-1" />
-                      Not Connected
-                    </Badge>
+                    <div className="text-right">
+                      <Badge className={
+                        calendarStatus?.status === 'connected'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-600'
+                      }>
+                        {calendarStatus?.status === 'connected' ? (
+                          <>
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Connected
+                          </>
+                        ) : (
+                          <>
+                            <X className="w-3 h-3 mr-1" />
+                            Not Connected
+                          </>
+                        )}
+                      </Badge>
+                      {calendarStatus?.error_message && (
+                        <p className="text-xs text-red-500 mt-1">{calendarStatus.error_message}</p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </CardContent>

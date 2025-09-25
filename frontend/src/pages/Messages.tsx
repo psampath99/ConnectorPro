@@ -9,11 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { TargetCompaniesModal } from '@/components/modals/TargetCompaniesModal';
 import { FloatingAIButton } from '@/components/ui/floating-ai-button';
+import { ToolOriginatedBadgeComponent } from '@/components/ui/tool-originated-badge';
 import { storage } from '@/lib/storage';
-import { Draft, Contact } from '@/types';
-import { 
-  MessageSquare, 
-  Search, 
+import { Draft, Contact, EnhancedGmailResponse, GmailEmail } from '@/types';
+import {
+  MessageSquare,
+  Search,
   Send,
   Edit,
   Trash2,
@@ -25,7 +26,8 @@ import {
   Lightbulb,
   Plus,
   Settings,
-  TrendingUp
+  TrendingUp,
+  Bot
 } from 'lucide-react';
 
 const Messages = () => {
@@ -36,6 +38,16 @@ const Messages = () => {
   const [filterTargetCompany, setFilterTargetCompany] = useState<string>('all');
   const [timeframe, setTimeframe] = useState<string>('7');
   const [targetCompanies, setTargetCompanies] = useState<string[]>([]);
+  const [gmailEmails, setGmailEmails] = useState<{ [company: string]: GmailEmail[] }>({});
+  const [toolOriginatedEmails, setToolOriginatedEmails] = useState<GmailEmail[]>([]);
+  const [gmailMetrics, setGmailMetrics] = useState<{
+    total_emails: number;
+    company_matched_emails: number;
+    tool_originated_emails: number;
+    companies_with_emails: string[];
+  } | null>(null);
+  const [isLoadingEmails, setIsLoadingEmails] = useState(false);
+  const [gmailConnected, setGmailConnected] = useState(false);
 
   useEffect(() => {
     const loadedDrafts = storage.getDrafts();
@@ -44,7 +56,87 @@ const Messages = () => {
     setDrafts(loadedDrafts);
     setContacts(loadedContacts);
     loadTargetCompanies();
+    checkGmailConnection();
   }, []);
+
+  const checkGmailConnection = async () => {
+    try {
+      const token = localStorage.getItem('connectorpro_auth_token');
+      if (!token) return;
+
+      const response = await fetch('/api/v1/gmail/status', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const connected = data.status === 'connected';
+        setGmailConnected(connected);
+        
+        if (connected) {
+          // Load emails from target companies
+          loadGmailEmails();
+        }
+      }
+    } catch (error) {
+      console.error('Error checking Gmail connection:', error);
+    }
+  };
+
+  const loadGmailEmails = async () => {
+    if (targetCompanies.length === 0) return;
+    
+    setIsLoadingEmails(true);
+    try {
+      const token = localStorage.getItem('connectorpro_auth_token');
+      if (!token) return;
+
+      const companiesParam = targetCompanies.join(',');
+      const response = await fetch(`http://localhost:8000/api/v1/gmail/emails/by-companies?target_companies=${encodeURIComponent(companiesParam)}&max_results=50`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data: EnhancedGmailResponse = await response.json();
+        console.log('📧 Enhanced Gmail emails loaded:', data);
+        
+        // Set company-matched emails
+        setGmailEmails(data.emails_by_company || {});
+        
+        // Set tool-originated emails
+        setToolOriginatedEmails(data.tool_originated_emails || []);
+        
+        // Set metrics
+        setGmailMetrics(data.metrics || null);
+        
+        console.log('📊 Gmail metrics:', {
+          totalEmails: data.metrics?.total_emails || 0,
+          companyMatched: data.metrics?.company_matched_emails || 0,
+          toolOriginated: data.metrics?.tool_originated_emails || 0,
+          companiesWithEmails: data.metrics?.companies_with_emails || []
+        });
+      } else {
+        console.error('Failed to load Gmail emails:', response.status);
+      }
+    } catch (error) {
+      console.error('Error loading Gmail emails:', error);
+    } finally {
+      setIsLoadingEmails(false);
+    }
+  };
+
+  // Reload emails when target companies change
+  useEffect(() => {
+    if (gmailConnected && targetCompanies.length > 0) {
+      loadGmailEmails();
+    }
+  }, [targetCompanies, gmailConnected]);
 
   const loadTargetCompanies = () => {
     // Get target companies from onboarding with fallback
@@ -94,17 +186,21 @@ const Messages = () => {
     return logoMap[company] || `https://logo.clearbit.com/${company.toLowerCase().replace(/\s+/g, '')}.com`;
   };
 
-  // Get messages by company with new statistics
+  // Get messages by company with new statistics including Gmail emails and tool-originated emails
   const getMessagesByCompanyStats = () => {
-    // Get all companies from messages
+    // Get all companies from messages and target companies
     const allCompanies = new Set<string>();
     
+    // Add companies from drafts
     drafts.forEach(draft => {
       const contact = contacts.find(c => c.id === draft.targetContactId);
       if (contact?.company) {
         allCompanies.add(contact.company);
       }
     });
+
+    // Add target companies (they should always appear)
+    targetCompanies.forEach(company => allCompanies.add(company));
 
     // Calculate stats for each company
     const companyStats = Array.from(allCompanies).map(company => {
@@ -115,11 +211,22 @@ const Messages = () => {
 
       const messagesSent = companyMessages.filter(m => m.status === 'sent').length;
       
-      // Simulate messages received (in a real app, this would come from actual data)
-      // Use a realistic response rate between 20-60% based on company and message count
-      const companyIndex = Array.from(allCompanies).indexOf(company);
-      const baseResponseRate = 0.3 + (companyIndex % 4) * 0.1; // 30%, 40%, 50%, 60%
-      const messagesReceived = Math.floor(messagesSent * baseResponseRate);
+      // Get real Gmail emails count for this company
+      const gmailEmailsCount = gmailEmails[company] ? gmailEmails[company].length : 0;
+      
+      // Get tool-originated emails for this company
+      const toolOriginatedForCompany = toolOriginatedEmails.filter(email =>
+        email.matched_company === company
+      ).length;
+      
+      // Use Gmail emails as "messages received" if available, otherwise simulate
+      let messagesReceived = gmailEmailsCount;
+      if (messagesReceived === 0 && messagesSent > 0) {
+        // Fallback simulation for companies without Gmail emails
+        const companyIndex = Array.from(allCompanies).indexOf(company);
+        const baseResponseRate = 0.3 + (companyIndex % 4) * 0.1;
+        messagesReceived = Math.floor(messagesSent * baseResponseRate);
+      }
       
       // Calculate response rate
       const responseRate = messagesSent > 0 ? Math.round((messagesReceived / messagesSent) * 100) : 0;
@@ -130,15 +237,19 @@ const Messages = () => {
         messagesReceived,
         responseRate,
         total: companyMessages.length,
+        gmailEmailsCount,
+        toolOriginatedCount: toolOriginatedForCompany,
         isTargetCompany: targetCompanies.includes(company)
       };
     });
 
-    // Sort by target companies first, then by messages sent
+    // Sort by target companies first, then by total activity (drafts + emails + tool-originated)
     return companyStats.sort((a, b) => {
       if (a.isTargetCompany && !b.isTargetCompany) return -1;
       if (!a.isTargetCompany && b.isTargetCompany) return 1;
-      return b.messagesSent - a.messagesSent;
+      const aActivity = a.total + a.gmailEmailsCount + a.toolOriginatedCount;
+      const bActivity = b.total + b.gmailEmailsCount + b.toolOriginatedCount;
+      return bActivity - aActivity;
     });
   };
 
@@ -164,17 +275,28 @@ const Messages = () => {
       });
     }
 
-    // Filter by search term
+    // Enhanced search functionality
     if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(draft => {
         const contact = contacts.find(c => c.id === draft.targetContactId);
         const contactName = contact?.name || '';
         const contactCompany = contact?.company || '';
         
-        return draft.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-               draft.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-               contactName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-               contactCompany.toLowerCase().includes(searchTerm.toLowerCase());
+        // Basic search fields
+        const basicMatch =
+          draft.subject?.toLowerCase().includes(searchLower) ||
+          draft.content.toLowerCase().includes(searchLower) ||
+          contactName.toLowerCase().includes(searchLower) ||
+          contactCompany.toLowerCase().includes(searchLower);
+        
+        // Enhanced search for draft types and metadata
+        const enhancedMatch =
+          draft.type.toLowerCase().includes(searchLower) ||
+          draft.tone.toLowerCase().includes(searchLower) ||
+          (draft.commonalityUsed && draft.commonalityUsed.description.toLowerCase().includes(searchLower));
+        
+        return basicMatch || enhancedMatch;
       });
     }
 
@@ -182,6 +304,28 @@ const Messages = () => {
       const dateA = new Date(a.createdAt).getTime();
       const dateB = new Date(b.createdAt).getTime();
       return dateB - dateA;
+    });
+  };
+
+  // Enhanced search function for Gmail emails (both company-matched and tool-originated)
+  const getFilteredGmailEmails = (emails: GmailEmail[]) => {
+    if (!searchTerm) return emails;
+    
+    const searchLower = searchTerm.toLowerCase();
+    return emails.filter(email => {
+      // Basic search fields
+      const basicMatch =
+        email.subject.toLowerCase().includes(searchLower) ||
+        email.sender.toLowerCase().includes(searchLower) ||
+        email.snippet.toLowerCase().includes(searchLower);
+      
+      // Enhanced search fields
+      const enhancedMatch =
+        email.matched_company?.toLowerCase().includes(searchLower) ||
+        email.tool_metadata?.original_request?.toLowerCase().includes(searchLower) ||
+        (email.is_tool_originated && ('tool'.includes(searchLower) || 'ai'.includes(searchLower) || 'automated'.includes(searchLower)));
+      
+      return basicMatch || enhancedMatch;
     });
   };
 
@@ -283,6 +427,121 @@ const Messages = () => {
   };
 
   const companyStats = getMessagesByCompanyStats();
+
+  // Gmail Email Card Component
+  const GmailEmailCard = ({ email }: { email: GmailEmail }) => {
+    const formatEmailDate = (dateStr: string) => {
+      try {
+        const date = new Date(dateStr);
+        return new Intl.DateTimeFormat('en-US', {
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        }).format(date);
+      } catch {
+        return 'Unknown date';
+      }
+    };
+
+    const extractSenderName = (sender: string) => {
+      if (sender.includes('<')) {
+        return sender.split('<')[0].trim().replace(/"/g, '');
+      }
+      return sender;
+    };
+
+    const extractSenderEmail = (sender: string) => {
+      if (sender.includes('<')) {
+        return sender.split('<')[1].split('>')[0];
+      }
+      return sender;
+    };
+
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+        <div className="flex items-start justify-between">
+          <div className="flex items-start space-x-3 flex-1">
+            <div className="flex flex-col items-center">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-2 ${
+                email.is_tool_originated ? 'bg-purple-100' : 'bg-green-100'
+              }`}>
+                <MessageSquare className={`w-5 h-5 ${
+                  email.is_tool_originated ? 'text-purple-600' : 'text-green-600'
+                }`} />
+              </div>
+              <Badge className={
+                email.is_tool_originated
+                  ? 'bg-purple-100 text-purple-800'
+                  : 'bg-green-100 text-green-800'
+              }>
+                <CheckCircle className="w-3 h-3 mr-1" />
+                received
+              </Badge>
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center space-x-2 mb-2 flex-wrap">
+                <h4 className="font-medium text-gray-900">{email.subject || 'No subject'}</h4>
+                
+                {/* Tool-originated badge */}
+                <ToolOriginatedBadgeComponent
+                  isToolOriginated={email.is_tool_originated}
+                  toolMetadata={email.tool_metadata}
+                  size="sm"
+                />
+                
+                {/* Company badge */}
+                {email.matched_company && (
+                  <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                    <Building2 className="w-3 h-3 mr-1" />
+                    {email.matched_company}
+                  </Badge>
+                )}
+              </div>
+              
+              {/* Sender */}
+              <div className="flex items-center space-x-2 mb-2">
+                <span className="text-sm font-medium text-gray-700">From:</span>
+                <Avatar className="w-5 h-5">
+                  <AvatarFallback className="bg-green-100 text-xs">
+                    {extractSenderName(email.sender).split(' ').map((n: string) => n[0]).join('').substring(0, 2) || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-sm text-gray-700">{extractSenderName(email.sender)}</span>
+                <span className="text-sm text-gray-500">{extractSenderEmail(email.sender)}</span>
+              </div>
+
+              {/* Content Preview */}
+              <div className="bg-gray-50 rounded-lg p-2 mb-2">
+                <p className="text-xs text-gray-700 line-clamp-2">
+                  {email.snippet || email.body_text?.substring(0, 150) + '...' || 'No content preview'}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-gray-500">
+                <div className="flex items-center">
+                  <Clock className="w-3 h-3 mr-1" />
+                  Received: {formatEmailDate(email.date)}
+                </div>
+                <div className="flex items-center space-x-2">
+                  {email.is_read ? (
+                    <Badge variant="outline" className="text-xs bg-gray-50">Read</Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700">Unread</Badge>
+                  )}
+                  {email.is_important && (
+                    <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700">Important</Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const MessageCard = ({ draft }: { draft: Draft }) => {
     const contact = contacts.find(c => c.id === draft.targetContactId);
@@ -562,6 +821,47 @@ const Messages = () => {
               </CardContent>
             </Card>
 
+            {/* Tool-Originated Messages Section */}
+            {toolOriginatedEmails.length > 0 && (
+              <Card className="border-l-4 border-l-purple-500">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <Bot className="w-6 h-6 text-purple-600" />
+                      <span>Tool-Originated Messages</span>
+                      <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+                        {toolOriginatedEmails.length} messages
+                      </Badge>
+                      {isLoadingEmails && (
+                        <Badge variant="outline" className="text-xs animate-pulse">
+                          Loading...
+                        </Badge>
+                      )}
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      <Bot className="w-3 h-3 mr-1" />
+                      AI Generated
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="bg-purple-50 rounded-lg p-4">
+                      <p className="text-sm text-purple-800">
+                        These messages were initiated or generated through ConnectorPro's AI tools and automation features.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      {getFilteredGmailEmails(toolOriginatedEmails).map((email, index) => (
+                        <GmailEmailCard key={`tool-${email.id}-${index}`} email={email} />
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Messages by Target Company */}
             {targetCompanies.length > 0 && (
               <div className="space-y-6">
@@ -572,13 +872,17 @@ const Messages = () => {
 
                 {targetCompanies.map((company) => {
                   const companyMessages = getMessagesByCompany(company);
+                  const companyGmailEmails = gmailEmails[company] || [];
                   
                   const companyStats = {
                     total: companyMessages.length,
                     draft: companyMessages.filter(m => m.status === 'draft').length,
                     sent: companyMessages.filter(m => m.status === 'sent').length,
-                    archived: companyMessages.filter(m => m.status === 'archived').length
+                    archived: companyMessages.filter(m => m.status === 'archived').length,
+                    received: companyGmailEmails.length
                   };
+
+                  const totalActivity = companyMessages.length + companyGmailEmails.length;
 
                   return (
                     <Card key={company} className="border-l-4 border-l-blue-500">
@@ -588,8 +892,13 @@ const Messages = () => {
                             <Building2 className="w-6 h-6 text-blue-600" />
                             <span>{company}</span>
                             <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                              {companyMessages.length} messages
+                              {totalActivity} total messages
                             </Badge>
+                            {isLoadingEmails && (
+                              <Badge variant="outline" className="text-xs animate-pulse">
+                                Loading emails...
+                              </Badge>
+                            )}
                           </div>
                           <Badge variant="outline" className="text-xs">
                             <Target className="w-3 h-3 mr-1" />
@@ -600,10 +909,10 @@ const Messages = () => {
                       <CardContent>
                         <div className="space-y-4">
                           {/* Company Stats */}
-                          <div className="grid grid-cols-4 gap-4 p-4 bg-blue-50 rounded-lg">
+                          <div className="grid grid-cols-5 gap-4 p-4 bg-blue-50 rounded-lg">
                             <div className="text-center">
                               <p className="text-lg font-bold text-blue-900">{companyStats.total}</p>
-                              <p className="text-xs text-blue-700">Total</p>
+                              <p className="text-xs text-blue-700">Drafts</p>
                             </div>
                             <div className="text-center">
                               <p className="text-lg font-bold text-yellow-600">{companyStats.draft}</p>
@@ -614,23 +923,61 @@ const Messages = () => {
                               <p className="text-xs text-blue-700">Sent</p>
                             </div>
                             <div className="text-center">
+                              <p className="text-lg font-bold text-emerald-600">{companyStats.received}</p>
+                              <p className="text-xs text-blue-700">Received</p>
+                            </div>
+                            <div className="text-center">
                               <p className="text-lg font-bold text-gray-600">{companyStats.archived}</p>
                               <p className="text-xs text-blue-700">Archived</p>
                             </div>
                           </div>
 
-                          {/* Messages for this company */}
-                          {companyMessages.length > 0 ? (
+                          {/* Gmail Connection Status */}
+                          {!gmailConnected && (
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                              <p className="text-sm text-yellow-800">
+                                📧 Connect Gmail to see received emails from {company}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Gmail Emails Section */}
+                          {companyGmailEmails.length > 0 && (
                             <div className="space-y-3">
+                              <h4 className="font-medium text-gray-900 flex items-center">
+                                <MessageSquare className="w-4 h-4 mr-2 text-green-600" />
+                                Received Emails ({companyGmailEmails.length})
+                              </h4>
+                              {getFilteredGmailEmails(companyGmailEmails).map((email: any, index: number) => (
+                                <GmailEmailCard key={`${email.id}-${index}`} email={email} />
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Draft Messages Section */}
+                          {companyMessages.length > 0 && (
+                            <div className="space-y-3">
+                              <h4 className="font-medium text-gray-900 flex items-center">
+                                <Edit className="w-4 h-4 mr-2 text-blue-600" />
+                                Draft Messages ({companyMessages.length})
+                              </h4>
                               {companyMessages.map((draft) => (
                                 <MessageCard key={draft.id} draft={draft} />
                               ))}
                             </div>
-                          ) : (
+                          )}
+
+                          {/* No Activity Message */}
+                          {totalActivity === 0 && (
                             <div className="text-center py-8 text-gray-500">
                               <MessageSquare className="w-8 h-8 mx-auto mb-2 text-gray-400" />
                               <p className="text-sm">No messages with {company} yet</p>
-                              <p className="text-xs">Compose your first message to get started</p>
+                              <p className="text-xs">
+                                {gmailConnected
+                                  ? "Compose your first message to get started"
+                                  : "Connect Gmail to see received emails and compose messages"
+                                }
+                              </p>
                             </div>
                           )}
                         </div>
