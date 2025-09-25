@@ -1,18 +1,41 @@
+# FastAPI and server
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
+
+# Database
 motor==3.3.2
+
+# Configuration
 python-dotenv==1.0.0
-pydantic==2.5.0
+
+# Data validation (compatible versions for Python 3.13)
+pydantic==2.4.2
+pydantic-core==2.10.1
+
+# Authentication and security
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+PyJWT==2.8.0
+cryptography==41.0.7
+
+# File handling
 python-multipart==0.0.6
-pandas>=2.2.0
+
+# Data processing (compatible versions)
+pandas==2.1.4
 openpyxl==3.1.2
 xlrd==2.0.1
-PyJWT==2.8.0
+
+# Google APIs
 google-auth==2.23.4
 google-auth-oauthlib==1.1.0
 google-auth-httplib2==0.1.1
 google-api-python-client==2.108.0
-cryptography==41.0.7
-aiohttp==3.9.1
+
+# HTTP client (compatible version)
+aiohttp==3.8.6
+
+# Additional dependencies for stability
+typing-extensions==4.8.0
+anyio==3.7.1
+starlette==0.27.0
