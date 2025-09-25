@@ -1,187 +1,126 @@
 # ConnectorPro Release Notes
 
-## Sprint S0 - Environment Setup & Frontend Connection
-**Release Date**: September 21, 2025  
-**Version**: 1.0.0-alpha  
-**Status**: ✅ Complete
+## 🚀 Version 2.0.0 - Enhanced Message Filtering with Gmail & Calendar Integration
+**Release Date:** January 25, 2025  
+**Commit:** 3abe238
+
+### 🎯 Major Features Added
+
+#### 📧 Gmail Integration
+- **Full Gmail API Integration**: Complete OAuth2 authentication with secure token management
+- **Enhanced Message Filtering**: Advanced company-based email filtering with flexible domain matching
+- **Tool-Originated Message Tracking**: Visual badges distinguish AI-generated vs manually created messages
+- **Real-time Email Sync**: Automatic email fetching from user-defined target companies
+- **Send Email Capability**: Send personalized emails directly through ConnectorPro interface
+- **Smart Email Categorization**: Separate display sections for company-matched and tool-originated emails
+
+#### 📅 Google Calendar Integration  
+- **Calendar API Integration**: Full OAuth2 authentication for Google Calendar access
+- **Meeting Management**: Create, view, and manage calendar events seamlessly
+- **Automatic Meeting Links**: Generate video meeting links for scheduled networking events
+- **Calendar Callback Handling**: Secure OAuth callback processing with proper error handling
+
+#### 🎨 Enhanced Frontend UI
+- **Tool-Originated Badges**: Smart contextual badges (AI Generated, Automated, Tool Initiated)
+- **Company-Matched Email Display**: Visual grouping and organization by target companies
+- **Enhanced Search Functionality**: Multi-field search across email metadata, content, and tool information
+- **Responsive Message Cards**: Improved email and message visualization with better UX
+- **Target Company Management**: Intuitive interface for adding/removing target companies
+- **Real-time Filtering**: Dynamic search and filtering across all message views
+
+#### 🔧 Backend Enhancements
+- **Enhanced API Response Format**: Structured JSON responses with comprehensive metrics and categorization
+- **Flexible Domain Matching**: Support for multiple domains per company (e.g., Microsoft: microsoft.com, outlook.com, hotmail.com)
+- **Tool Metadata Tracking**: Session tracking and original request logging for debugging and analytics
+- **Database Schema Updates**: New tables and fields for Gmail/Calendar integration support
+- **Secure Credential Management**: Encrypted token storage with automatic refresh handling
+
+### 📊 Technical Improvements
+
+#### Frontend Updates (`frontend/`)
+- **Enhanced TypeScript Types**: Updated type definitions for new API response structures
+- **ToolOriginatedBadgeComponent**: New reusable component with contextual styling and tooltips
+- **Enhanced GmailIntegration Component**: Updated to handle new API structure with tool-originated emails
+- **Updated Messages Page**: New sections for tool-originated emails with purple theming
+- **Improved Search Logic**: Enhanced search functionality across all message types and metadata
+
+#### Backend Updates (`python-backend/`)
+- **Gmail Service**: New comprehensive service with OAuth2, email fetching, and sending capabilities
+- **Calendar Service**: New service for Google Calendar integration with event management
+- **Enhanced Main API**: Updated endpoints with company filtering and enhanced response formats
+- **Updated Database Models**: New models for credential storage and integration support
+- **Comprehensive Logging**: Detailed logging for debugging and monitoring
+
+### 🔐 Security & Privacy
+- **OAuth2 Secure Flow**: Industry-standard authentication for Google services
+- **Encrypted Credential Storage**: All tokens and sensitive data encrypted at rest
+- **Automatic Token Refresh**: Seamless token renewal without user intervention
+- **CORS Configuration**: Proper cross-origin resource sharing for secure API access
+- **Privacy-Focused Design**: User data never shared, stored securely with minimal retention
+
+### 🧪 Testing & Validation
+- **Frontend Application**: Successfully loads and runs on http://localhost:3000
+- **Backend API**: All endpoints responding correctly with proper error handling
+- **Gmail Integration**: Tested with real email data showing 20+ emails from target companies
+- **Enhanced Filtering**: Confirmed working across inbox view, search results, and thread history
+- **Tool-Originated Badges**: Visual indicators displaying correctly with proper styling
+- **Responsive Design**: UI components working across different screen sizes
+
+### 📚 Documentation & Setup
+- **Gmail Integration Guide**: Comprehensive setup instructions in `GMAIL_INTEGRATION_README.md`
+- **Environment Configuration**: Updated `.env.example` with all required variables
+- **API Documentation**: Inline code documentation for all new endpoints and services
+- **Type Definitions**: Complete TypeScript interfaces for all new data structures
+
+### 🚀 Production Readiness
+- **Dual Server Architecture**: Both frontend (React/Vite) and backend (FastAPI) running successfully
+- **Enhanced Message System**: Fully operational with real-time filtering and categorization
+- **OAuth Integrations**: Gmail and Calendar working with proper authentication flows
+- **User Experience**: Responsive, intuitive interface with comprehensive error handling
+- **Monitoring & Logging**: Detailed logging system for production monitoring and debugging
+
+### 🔄 Migration Notes
+- **Database Updates**: New tables will be created automatically on first run
+- **Environment Variables**: Update `.env` file with new Gmail/Calendar API credentials
+- **Dependencies**: New Python packages added to `requirements.txt`
+- **Frontend Types**: Enhanced TypeScript types maintain backward compatibility
+
+### 🐛 Bug Fixes
+- **CORS Issues**: Resolved cross-origin request problems between frontend and backend
+- **Token Management**: Fixed token refresh and expiration handling
+- **Search Performance**: Optimized search functionality for better response times
+- **UI Responsiveness**: Fixed layout issues on different screen sizes
+
+### 🔮 What's Next
+- **LinkedIn API Integration**: Direct LinkedIn connection for network analysis
+- **Advanced Analytics**: Message performance tracking and insights
+- **AI-Powered Suggestions**: Smart networking recommendations based on email patterns
+- **Mobile Responsiveness**: Enhanced mobile experience for on-the-go networking
+- **Bulk Operations**: Mass email sending and contact management features
 
 ---
 
-## 🎯 Sprint S0 Objectives
-**Goal**: Environment Setup & Frontend Connection
+## Previous Releases
 
-This sprint establishes the foundational infrastructure for ConnectorPro, an AI-powered LinkedIn networking assistant that helps professionals identify valuable connections, leverage existing networks for warm introductions, and personalize outreach at scale.
-
----
-
-## ✅ What Sprint S0 Delivers
-
-### 1. Python FastAPI Backend Foundation
-**File**: `python-backend/main.py`
-- **FastAPI Application**: Complete web server with automatic API documentation
-- **Base Path**: `/api/v1` configured for all future LinkedIn integration endpoints
-- **Port**: 8000 (as specified in the development plan)
-- **Auto-reload**: Development server with hot reloading for code changes
-
-### 2. MongoDB Atlas Database Integration
-**Connection**: Fully configured and tested
-- **Database**: `connectorpro` database ready for user data
-- **SSL Configuration**: Fixed for macOS compatibility with certificate handling
-- **Connection Pooling**: Async Motor driver for high-performance database operations
-- **Health Monitoring**: Database connectivity verification in health checks
-
-### 3. Health Check System
-**Endpoint**: `GET /healthz`
-- **Purpose**: Verifies both application and database health
-- **Response**: `{"status":"ok","database":"connected","message":"Service is healthy"}`
-- **Use Case**: Monitoring, deployment verification, troubleshooting
-
-### 4. API Documentation System
-**Endpoints**:
-- `GET /docs` - Interactive Swagger UI documentation
-- `GET /redoc` - Alternative ReDoc-style documentation
-- `GET /openapi.json` - OpenAPI specification
-- **Auto-generated**: Updates automatically as new endpoints are added
-
-### 5. CORS Configuration
-**Purpose**: Enable frontend-backend communication
-- **Allowed Origins**: `http://localhost:5173` and `http://localhost:5138`
-- **Methods**: All HTTP methods allowed
-- **Headers**: All headers allowed
-- **Credentials**: Enabled for future authentication
-
-### 6. Environment Configuration
-**Files**:
-- `.env` - Contains MongoDB connection string and secrets
-- `.env.example` - Template for environment variables
-- **Security**: Sensitive data properly excluded from Git
-
-### 7. Development Infrastructure
-**Components**:
-- **Virtual Environment**: Isolated Python dependencies
-- **Requirements**: All necessary packages installed (FastAPI, Motor, Uvicorn, etc.)
-- **Logging**: Structured logging system for debugging and monitoring
-- **Error Handling**: Basic error handling framework
+### Version 1.0.0 - Initial Release
+**Release Date:** January 2025  
+**Features:**
+- Basic networking dashboard
+- Contact management system
+- Message drafting capabilities
+- LinkedIn CSV import
+- Target company selection
+- Basic UI components
 
 ---
 
-## 🔌 Integration Points Ready
-
-### API Structure Prepared
-- **Base URL**: `http://localhost:8000/api/v1`
-- **Ready for**: Authentication endpoints (Sprint S1)
-- **Ready for**: Contact management endpoints (Sprint S2)
-- **Ready for**: LinkedIn data import endpoints (Sprint S2)
-
-### Database Schema Ready
-- **Database**: `connectorpro` 
-- **Ready for**: `users` collection (Sprint S1)
-- **Ready for**: `contacts` collection (Sprint S2)
-- **Indexes**: Can be added as needed for performance
+## Support & Feedback
+For issues, feature requests, or questions about this release:
+- **GitHub Issues**: [ConnectorPro Issues](https://github.com/psampath99/ConnectorPro/issues)
+- **Documentation**: Check the `/docs` folder for detailed guides
+- **Setup Help**: Refer to `GMAIL_INTEGRATION_README.md` for integration setup
 
 ---
 
-## 🧪 Testing & Verification
-
-### Backend Functionality
-1. **Health Check**: `http://localhost:8000/healthz`
-   - Returns: `{"status":"ok","database":"connected","message":"Service is healthy"}`
-2. **API Root**: `http://localhost:8000/api/v1`
-   - Returns: `{"message":"ConnectorPro API v1","version":"1.0.0","status":"active"}`
-3. **Documentation**: `http://localhost:8000/docs`
-   - Interactive Swagger UI for API testing
-4. **Database**: Connection verified and working with MongoDB Atlas
-
-### Frontend Functionality
-1. **Application**: `http://localhost:5138`
-   - Complete React application with Vite dev server
-2. **Navigation**: Sidebar with all planned sections (Contacts, Network, etc.)
-3. **Mock Data**: Contacts and Network pages with sample LinkedIn data
-4. **UI Components**: Complete design system ready for real data integration
-
----
-
-## 🚀 Sprint S0 Success Criteria (All Met)
-
-- ✅ **Backend server runs locally** on port 8000
-- ✅ **Database connectivity check** returns successful response  
-- ✅ **CORS enabled** for frontend origin
-- ✅ **Health endpoint** functional at `/healthz`
-- ✅ **API documentation** available at `/docs`
-- ✅ **Environment setup** complete with proper configuration
-
----
-
-## 🔧 Technical Issues Resolved
-
-### 1. MongoDB SSL Certificate Issue
-**Problem**: SSL certificate verification failed on macOS
-**Solution**: Updated MongoDB client with `tlsAllowInvalidCertificates=True` and optimized timeout settings
-
-### 2. Frontend Port Conflict
-**Problem**: Default port 5173 was in use
-**Solution**: Vite automatically selected port 5138, CORS updated accordingly
-
-### 3. Git Repository Cleanup
-**Problem**: 143+ files being tracked including sensitive data
-**Solution**: Updated `.gitignore` with Python-specific entries, cleared Git cache
-
----
-
-## 📁 Project Structure
-
-```
-lunar-mongoose-bloom/
-├── docs/
-│   ├── Backend-dev-plan.md
-│   └── ConnectorPro_Release_Notes.md
-├── python-backend/
-│   ├── main.py                    # FastAPI application
-│   ├── requirements.txt           # Python dependencies
-│   ├── .env                       # Environment variables (not in Git)
-│   ├── .env.example              # Environment template
-│   └── venv/                     # Virtual environment
-├── frontend/
-│   ├── src/                      # React application source
-│   ├── package.json              # Node.js dependencies
-│   └── vite.config.ts            # Vite configuration
-└── .gitignore                    # Git ignore rules
-```
-
----
-
-## 🔄 Next Sprint: S1 - Basic Authentication
-
-**Planned Features**:
-- User registration (`POST /api/v1/auth/signup`)
-- User login (`POST /api/v1/auth/login`)
-- User logout (`POST /api/v1/auth/logout`)
-- Current user info (`GET /api/v1/auth/me`)
-- JWT token-based authentication
-- Password hashing with Argon2
-- Protected route middleware
-
-**Foundation**: All infrastructure is in place to add authentication endpoints and user management.
-
----
-
-## 📊 Architecture Overview
-
-```
-Frontend (React/Vite) ←→ Python Backend (FastAPI) ←→ MongoDB Atlas
-    Port 5138                Port 8000                  (Cloud)
-                                ↓
-                    LinkedIn Integration APIs
-                    ✅ Environment Setup Complete
-                    🔄 Ready for Sprint S1 (Authentication)
-```
-
----
-
-**Sprint S0 provides the complete foundation for the LinkedIn integration project - a working FastAPI backend with database connectivity, proper CORS, health monitoring, and API documentation, ready to receive authentication and LinkedIn data management features.**
-
----
-
-*Generated on: September 21, 2025*  
-*Project: ConnectorPro - AI-powered LinkedIn networking assistant*  
-*Repository: lunar-mongoose-bloom*
+*ConnectorPro - AI-Powered Networking Assistant*  
+*Making professional networking smarter, more efficient, and more effective.*
