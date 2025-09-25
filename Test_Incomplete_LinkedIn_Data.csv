@@ -1,0 +1,10 @@
+Connections
+Notes:
+When exporting your connections from LinkedIn, you'll get a CSV file with the following format.
+This file contains your 1st-degree connections only.
+
+First Name,Last Name,URL,Email Address,Company,Position,Connected On
+John,,https://www.linkedin.com/in/johnsmith,,TechCorp,Developer,25 Dec 2023
+,Smith,https://www.linkedin.com/in/smithjane,jane@example.com,DataInc,,24 Dec 2023
+,,,contact@company.com,CompanyOnly,Manager,23 Dec 2023
+Alex,Johnson,,,StartupX,,22 Dec 2023

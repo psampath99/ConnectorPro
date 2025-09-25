@@ -67,23 +67,55 @@ const Settings = () => {
     error_message?: string;
   } | null>(null);
 
-  useEffect(() => {
-    const userData = storage.getUser();
-    setUser(userData);
+  // Fetch target companies from backend API (similar to Network page)
+  const fetchTargetCompanies = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/v1/target-companies', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken') || 'demo-token'}`
+        }
+      });
 
-    // Load target companies
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.companies) {
+          const companyNames = data.companies.map((tc: any) => tc.company_name);
+          setTargetCompanies(companyNames);
+          setOriginalTargetCompanies(companyNames);
+          console.log('Loaded target companies from API:', companyNames);
+          return companyNames;
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching target companies from API:', err);
+    }
+    
+    // Fallback to localStorage
     const companies = localStorage.getItem('connectorpro_target_companies');
     if (companies) {
       try {
         const parsedCompanies = JSON.parse(companies);
         setTargetCompanies(parsedCompanies);
         setOriginalTargetCompanies(parsedCompanies);
+        console.log('Loaded target companies from localStorage:', parsedCompanies);
+        return parsedCompanies;
       } catch (error) {
         console.error('Error parsing target companies:', error);
         setTargetCompanies([]);
         setOriginalTargetCompanies([]);
       }
     }
+    return [];
+  };
+
+  useEffect(() => {
+    const userData = storage.getUser();
+    setUser(userData);
+
+    // Load target companies from API first, then fallback to localStorage
+    fetchTargetCompanies();
 
     // Load contact stats and integration statuses
     fetchContactStats();
@@ -176,10 +208,58 @@ const Settings = () => {
     setTargetCompanies(prev => prev.filter(c => c !== company));
   };
 
-  const handleSaveChanges = () => {
-    localStorage.setItem('connectorpro_target_companies', JSON.stringify(targetCompanies));
-    setOriginalTargetCompanies([...targetCompanies]);
-    setHasChanges(false);
+  const handleSaveChanges = async () => {
+    console.log('🔍 DEBUG - handleSaveChanges called with companies:', targetCompanies);
+    
+    try {
+      // Save to backend API using bulk endpoint
+      const response = await fetch('http://localhost:8000/api/v1/target-companies/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken') || 'demo-token'}`
+        },
+        body: JSON.stringify(
+          targetCompanies.map(company => ({
+            company_name: company,
+            company_domains: [] // Default empty domains, can be enhanced later
+          }))
+        )
+      });
+
+      console.log('🔍 DEBUG - API response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('🔍 DEBUG - API response data:', data);
+        
+        if (data.success) {
+          // Also save to localStorage as backup
+          localStorage.setItem('connectorpro_target_companies', JSON.stringify(targetCompanies));
+          setOriginalTargetCompanies([...targetCompanies]);
+          setHasChanges(false);
+          console.log('✅ Successfully saved target companies to backend and localStorage');
+        } else {
+          console.error('❌ Backend API returned success=false:', data);
+          throw new Error(data.message || 'Failed to save target companies');
+        }
+      } else {
+        const errorText = await response.text();
+        console.error('❌ Backend API error:', response.status, errorText);
+        throw new Error(`API error: ${response.status} ${errorText}`);
+      }
+    } catch (error) {
+      console.error('❌ Error saving target companies to backend:', error);
+      
+      // Fallback to localStorage only
+      console.log('🔄 Falling back to localStorage only');
+      localStorage.setItem('connectorpro_target_companies', JSON.stringify(targetCompanies));
+      setOriginalTargetCompanies([...targetCompanies]);
+      setHasChanges(false);
+      
+      // Show user a warning that backend save failed
+      alert('Warning: Changes saved locally but failed to sync with server. Please try again or contact support if the issue persists.');
+    }
   };
 
   const handleResetChanges = () => {

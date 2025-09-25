@@ -45,7 +45,7 @@ class Contact(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
     linkedinUrl: Optional[str] = None
-    degree: Optional[ContactDegree] = ContactDegree.SECOND
+    degree: Optional[ContactDegree] = ContactDegree.FIRST  # Default to 1st degree connections
     relationshipStrength: Optional[RelationshipStrength] = RelationshipStrength.MEDIUM
     commonalities: Optional[List[str]] = []
     notes: Optional[str] = ""
@@ -216,3 +216,22 @@ class EnhancedEmailsResponse(BaseModel):
     filtered_count: int
     original_count: int
     target_companies: List[str]
+
+# LLM Network Query Models
+class NetworkQueryRequest(BaseModel):
+    query: str
+    conversation_history: Optional[List[Dict[str, str]]] = []
+    provider: Optional[str] = None  # "openai", "anthropic", "local"
+
+class NetworkQueryResponse(BaseModel):
+    success: bool
+    query_type: str
+    title: str
+    summary: str
+    visualization_type: str
+    data: Any
+    confidence: float
+    reasoning: Optional[str] = None
+    provider_used: Optional[str] = None
+    processing_time: Optional[float] = None
+    error_message: Optional[str] = None

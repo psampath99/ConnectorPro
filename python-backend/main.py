@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 import logging
 import time
 import asyncio
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 # Import our models and services
@@ -18,13 +18,15 @@ from models import (
     GmailStatusResponse, GmailEmailsResponse, GmailSearchRequest,
     GmailSendRequest, GmailSendResponse, GmailConnectionStatus,
     UserTargetCompany, ToolOriginatedMessage, EnhancedGmailEmail,
-    TargetCompanyRequest, TargetCompanyResponse, EnhancedEmailsResponse
+    TargetCompanyRequest, TargetCompanyResponse, EnhancedEmailsResponse,
+    NetworkQueryRequest, NetworkQueryResponse
 )
 from database import DatabaseService
 from csv_service_enhanced import CSVService
 from auth import get_current_user, get_current_user_strict, AuthService
 from gmail_service import gmail_service
 from calendar_service import calendar_service
+from llm_service import llm_service, LLMQuery, NetworkDataContext, LLMProvider
 from pydantic import BaseModel
 
 # Load environment variables
@@ -89,7 +91,7 @@ app = FastAPI(
 )
 
 # Configure CORS
-cors_origins = ["http://localhost:5173", "http://localhost:5138", "http://localhost:5137", "http://localhost:5139", "http://localhost:5140", "http://127.0.0.1:5138", "http://127.0.0.1:5173", "http://127.0.0.1:5137", "http://127.0.0.1:5139", "http://127.0.0.1:5140"]
+cors_origins = ["http://localhost:5173", "http://localhost:5138", "http://localhost:5137", "http://localhost:5139", "http://localhost:5140", "http://localhost:5141", "http://127.0.0.1:5138", "http://127.0.0.1:5173", "http://127.0.0.1:5137", "http://127.0.0.1:5139", "http://127.0.0.1:5140", "http://127.0.0.1:5141"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
@@ -189,6 +191,73 @@ async def get_contact_stats(
         logger.error(f"Error getting contact stats: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve contact statistics")
 
+@app.post("/api/v1/contacts/migrate-degrees")
+async def migrate_contact_degrees(
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Migrate existing contacts to ensure proper degree filtering"""
+    try:
+        # Update all contacts without a degree field to be 1st degree
+        result = await db.db.contacts.update_many(
+            {"degree": {"$exists": False}},
+            {"$set": {"degree": 1}}
+        )
+        
+        # Update all contacts with degree = 2 or 3 to be 1st degree (since CSV imports should be 1st degree)
+        result2 = await db.db.contacts.update_many(
+            {"degree": {"$in": [2, 3]}},
+            {"$set": {"degree": 1}}
+        )
+        
+        total_updated = result.modified_count + result2.modified_count
+        
+        return {
+            "success": True,
+            "message": f"Successfully migrated {total_updated} contacts to 1st degree",
+            "updated_count": total_updated,
+            "missing_degree_updated": result.modified_count,
+            "non_first_degree_updated": result2.modified_count
+        }
+    except Exception as e:
+        logger.error(f"Error migrating contact degrees: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to migrate contact degrees: {str(e)}")
+
+@app.get("/api/v1/contacts/first-degree-only", response_model=ContactsResponse)
+async def get_first_degree_contacts_only(
+    page: int = Query(1, ge=1),
+    limit: int = Query(100, ge=1, le=1000),
+    company: Optional[str] = Query(None),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Get only 1st degree connections with explicit filtering"""
+    try:
+        skip = (page - 1) * limit
+        
+        # Build filters - explicitly filter for 1st degree only
+        filters = {"degree": 1}
+        if company:
+            filters["company"] = {"$regex": company, "$options": "i"}
+        
+        # Use direct database query to ensure filtering
+        cursor = db.contacts_collection.find(filters).skip(skip).limit(limit)
+        contacts = []
+        async for doc in cursor:
+            doc['id'] = str(doc['_id'])
+            del doc['_id']
+            contacts.append(Contact(**doc))
+        
+        total = await db.contacts_collection.count_documents(filters)
+        
+        return ContactsResponse(
+            contacts=contacts,
+            total=total,
+            page=page,
+            limit=limit
+        )
+    except Exception as e:
+        logger.error(f"Error getting first degree contacts: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve first degree contacts")
+
 @app.get("/api/v1/contacts", response_model=ContactsResponse)
 async def get_contacts(
     page: int = Query(1, ge=1),
@@ -217,6 +286,291 @@ async def get_contacts(
     except Exception as e:
         logger.error(f"Error getting contacts: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve contacts")
+
+# ENHANCED CONTACTS FILTERING ENDPOINTS (must come before generic {contact_id} route)
+
+@app.get("/api/v1/contacts/target-companies", response_model=ContactsResponse)
+async def get_contacts_by_target_companies(
+    page: int = Query(1, ge=1),
+    limit: int = Query(100, ge=1, le=1000),
+    require_title: bool = Query(True, description="Filter out contacts without meaningful titles"),
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Get contacts filtered by user's target companies with optional title filtering"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        skip = (page - 1) * limit
+        
+        # DEBUG LOGGING: Log the request parameters
+        logger.info(f"🔍 DEBUG - Target companies contacts API called for user {user_id}")
+        logger.info(f"🔍 DEBUG - Parameters: page={page}, limit={limit}, require_title={require_title}")
+        
+        # Get user's target companies
+        target_companies = await db.get_target_companies_by_user_id(user_id)
+        logger.info(f"🔍 DEBUG - Found {len(target_companies)} target companies in database")
+        
+        if not target_companies:
+            logger.info(f"🔍 DEBUG - No target companies found, returning empty result")
+            return ContactsResponse(
+                contacts=[],
+                total=0,
+                page=page,
+                limit=limit
+            )
+        
+        # Extract company names for filtering
+        company_names = [tc.company_name for tc in target_companies]
+        logger.info(f"🔍 DEBUG - Target company names: {company_names}")
+        
+        # Build filters
+        filters = {
+            "degree": 1,  # Only 1st degree connections
+            "company": {"$in": company_names}
+        }
+        
+        # Add title filtering if required
+        if require_title:
+            filters["title"] = {
+                "$exists": True,
+                "$ne": "",
+                "$not": {"$regex": "^\\s*$"}  # Not just whitespace
+            }
+            logger.info(f"🔍 DEBUG - Title filtering enabled")
+        
+        logger.info(f"🔍 DEBUG - Final MongoDB filters: {filters}")
+        
+        # Get contacts
+        cursor = db.contacts_collection.find(filters).skip(skip).limit(limit)
+        contacts = []
+        async for doc in cursor:
+            doc['id'] = str(doc['_id'])
+            del doc['_id']
+            contacts.append(Contact(**doc))
+        
+        total = await db.contacts_collection.count_documents(filters)
+        
+        logger.info(f"🔍 DEBUG - Found {len(contacts)} contacts (page {page}) out of {total} total matching contacts")
+        
+        return ContactsResponse(
+            contacts=contacts,
+            total=total,
+            page=page,
+            limit=limit
+        )
+    except Exception as e:
+        logger.error(f"Error getting contacts by target companies: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve target company contacts")
+
+@app.get("/api/v1/contacts/grouped-by-company")
+async def get_contacts_grouped_by_target_companies(
+    require_title: bool = Query(True, description="Filter out contacts without meaningful titles"),
+    target_companies_only: bool = Query(False, description="Filter to target companies only"),
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Get contacts grouped by target companies with title filtering"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        
+        # DEBUG LOGGING: Log the request parameters
+        logger.info(f"🔍 DEBUG - Grouped contacts API called for user {user_id}")
+        logger.info(f"🔍 DEBUG - Parameters: require_title={require_title}, target_companies_only={target_companies_only}")
+        
+        # Get user's target companies
+        target_companies = await db.get_target_companies_by_user_id(user_id)
+        logger.info(f"🔍 DEBUG - Found {len(target_companies)} target companies in database")
+        
+        if not target_companies:
+            logger.info(f"🔍 DEBUG - No target companies found, returning empty result")
+            return {
+                "success": True,
+                "companies": {},
+                "total_contacts": 0,
+                "companies_with_contacts": 0,
+                "target_companies": []
+            }
+        
+        # Extract company names for filtering
+        company_names = [tc.company_name for tc in target_companies]
+        logger.info(f"🔍 DEBUG - Target company names: {company_names}")
+        
+        # Build base filters
+        base_filters = {
+            "degree": 1,  # Only 1st degree connections
+        }
+        
+        # Only filter by target companies if target_companies_only is True
+        if target_companies_only:
+            base_filters["company"] = {"$in": company_names}
+            logger.info(f"🔍 DEBUG - Filtering to target companies only: {company_names}")
+        else:
+            logger.info(f"🔍 DEBUG - Including all companies (not filtering to target companies)")
+        
+        # Add title filtering if required
+        if require_title:
+            base_filters["title"] = {
+                "$exists": True,
+                "$ne": "",
+                "$not": {"$regex": "^\\s*$"}  # Not just whitespace
+            }
+            logger.info(f"🔍 DEBUG - Title filtering enabled")
+        
+        logger.info(f"🔍 DEBUG - Final MongoDB filters: {base_filters}")
+        
+        # Group contacts by company using aggregation
+        pipeline = [
+            {"$match": base_filters},
+            {"$group": {
+                "_id": "$company",
+                "contacts": {"$push": "$$ROOT"},
+                "count": {"$sum": 1}
+            }},
+            {"$sort": {"count": -1}}
+        ]
+        
+        cursor = db.contacts_collection.aggregate(pipeline)
+        companies_data = {}
+        total_contacts = 0
+        
+        async for group in cursor:
+            company_name = group["_id"]
+            contacts_data = group["contacts"]
+            
+            # Transform contacts
+            contacts = []
+            for doc in contacts_data:
+                doc['id'] = str(doc['_id'])
+                del doc['_id']
+                contacts.append(Contact(**doc).dict())
+            
+            companies_data[company_name] = {
+                "contacts": contacts,
+                "count": group["count"]
+            }
+            total_contacts += group["count"]
+        
+        logger.info(f"🔍 DEBUG - Found {len(companies_data)} companies with {total_contacts} total contacts")
+        logger.info(f"🔍 DEBUG - Companies found: {list(companies_data.keys())}")
+        
+        return {
+            "success": True,
+            "companies": companies_data,
+            "total_contacts": total_contacts,
+            "companies_with_contacts": len(companies_data),
+            "target_companies": company_names,
+            "title_filtering_enabled": require_title
+        }
+    except Exception as e:
+        logger.error(f"Error getting contacts grouped by target companies: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve grouped contacts")
+
+@app.get("/api/v1/contacts/target-companies/stats")
+async def get_target_company_contact_stats(
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Get statistics about contacts at target companies"""
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        
+        # Get user's target companies
+        target_companies = await db.get_target_companies_by_user_id(user_id)
+        if not target_companies:
+            return {
+                "success": True,
+                "stats": {
+                    "total_target_companies": 0,
+                    "companies_with_contacts": 0,
+                    "total_contacts_at_targets": 0,
+                    "contacts_with_titles": 0,
+                    "contacts_without_titles": 0,
+                    "title_coverage_percentage": 0
+                },
+                "company_breakdown": []
+            }
+        
+        company_names = [tc.company_name for tc in target_companies]
+        
+        # Get all contacts at target companies
+        all_contacts_filter = {
+            "degree": 1,
+            "company": {"$in": company_names}
+        }
+        
+        # Get contacts with titles
+        with_titles_filter = {
+            "degree": 1,
+            "company": {"$in": company_names},
+            "title": {
+                "$exists": True,
+                "$ne": "",
+                "$not": {"$regex": "^\\s*$"}
+            }
+        }
+        
+        # Count totals
+        total_contacts = await db.contacts_collection.count_documents(all_contacts_filter)
+        contacts_with_titles = await db.contacts_collection.count_documents(with_titles_filter)
+        contacts_without_titles = total_contacts - contacts_with_titles
+        
+        # Get breakdown by company
+        pipeline = [
+            {"$match": all_contacts_filter},
+            {"$group": {
+                "_id": "$company",
+                "total_contacts": {"$sum": 1},
+                "contacts_with_titles": {
+                    "$sum": {
+                        "$cond": [
+                            {
+                                "$and": [
+                                    {"$ne": ["$title", ""]},
+                                    {"$ne": ["$title", None]},
+                                    {"$not": {"$regexMatch": {"input": "$title", "regex": "^\\s*$"}}}
+                                ]
+                            },
+                            1,
+                            0
+                        ]
+                    }
+                }
+            }},
+            {"$sort": {"total_contacts": -1}}
+        ]
+        
+        cursor = db.contacts_collection.aggregate(pipeline)
+        company_breakdown = []
+        companies_with_contacts = 0
+        
+        async for group in cursor:
+            if group["total_contacts"] > 0:
+                companies_with_contacts += 1
+                company_breakdown.append({
+                    "company": group["_id"],
+                    "total_contacts": group["total_contacts"],
+                    "contacts_with_titles": group["contacts_with_titles"],
+                    "contacts_without_titles": group["total_contacts"] - group["contacts_with_titles"],
+                    "title_coverage_percentage": round((group["contacts_with_titles"] / group["total_contacts"]) * 100, 1) if group["total_contacts"] > 0 else 0
+                })
+        
+        title_coverage_percentage = round((contacts_with_titles / total_contacts) * 100, 1) if total_contacts > 0 else 0
+        
+        return {
+            "success": True,
+            "stats": {
+                "total_target_companies": len(target_companies),
+                "companies_with_contacts": companies_with_contacts,
+                "total_contacts_at_targets": total_contacts,
+                "contacts_with_titles": contacts_with_titles,
+                "contacts_without_titles": contacts_without_titles,
+                "title_coverage_percentage": title_coverage_percentage
+            },
+            "company_breakdown": company_breakdown
+        }
+    except Exception as e:
+        logger.error(f"Error getting target company contact stats: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve contact statistics")
 
 @app.post("/api/v1/contacts", response_model=Contact)
 async def create_contact(
@@ -1352,6 +1706,12 @@ async def get_target_companies(
         user_id = current_user.get("user_id", "demo-user")
         companies = await db.get_target_companies_by_user_id(user_id)
         
+        # DEBUG LOGGING: Log target companies data for debugging
+        logger.info(f"🔍 DEBUG - Target Companies API called for user {user_id}")
+        logger.info(f"🔍 DEBUG - Found {len(companies)} target companies in database:")
+        for company in companies:
+            logger.info(f"🔍 DEBUG - Company: {company.company_name} (ID: {company.id})")
+        
         return TargetCompanyResponse(
             success=True,
             message=f"Retrieved {len(companies)} target companies",
@@ -1498,6 +1858,7 @@ async def set_target_companies_bulk(
     except Exception as e:
         logger.error(f"Error setting target companies in bulk: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to set target companies: {str(e)}")
+
 
 # TOOL-ORIGINATED MESSAGES ENDPOINTS
 
@@ -1835,6 +2196,219 @@ async def clear_invalid_calendar_tokens(
     except Exception as e:
         logger.error(f"Error clearing invalid calendar tokens: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to clear invalid tokens: {str(e)}")
+
+# NETWORK QUERY LLM ENDPOINTS
+
+@app.post("/api/v1/network/query", response_model=NetworkQueryResponse)
+async def process_network_query(
+    request: NetworkQueryRequest,
+    current_user: dict = Depends(get_current_user),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Process natural language queries about network data using LLM"""
+    start_time = time.time()
+    
+    try:
+        user_id = current_user.get("user_id", "demo-user")
+        
+        # Build context about available data
+        context = NetworkDataContext()
+        
+        # Get basic stats
+        try:
+            context.total_contacts = await db.count_contacts()
+            
+            # Get target companies
+            target_companies = await db.get_target_companies_by_user_id(user_id)
+            context.target_companies = [tc.company_name for tc in target_companies]
+            
+            # Get company count (approximate)
+            pipeline = [
+                {"$match": {"degree": 1}},
+                {"$group": {"_id": "$company"}},
+                {"$count": "total"}
+            ]
+            result = await db.contacts_collection.aggregate(pipeline).to_list(length=1)
+            context.total_companies = result[0]["total"] if result else 0
+            
+        except Exception as e:
+            logger.warning(f"Failed to build complete context: {e}")
+            # Continue with partial context
+        
+        # Create LLM query
+        llm_query = LLMQuery(
+            query=request.query,
+            user_id=user_id,
+            conversation_history=request.conversation_history or []
+        )
+        
+        # Process with LLM
+        provider = None
+        if request.provider:
+            try:
+                provider = LLMProvider(request.provider.lower())
+            except ValueError:
+                logger.warning(f"Invalid provider '{request.provider}', using default")
+        
+        llm_response = await llm_service.process_query(llm_query, context, provider)
+        
+        # Execute the API calls suggested by the LLM
+        data = await _execute_api_calls(llm_response.api_calls, user_id, db)
+        
+        processing_time = time.time() - start_time
+        
+        return NetworkQueryResponse(
+            success=True,
+            query_type=llm_response.query_type.value,
+            title=llm_response.title,
+            summary=llm_response.summary,
+            visualization_type=llm_response.visualization_type.value,
+            data=data,
+            confidence=llm_response.confidence,
+            reasoning=llm_response.reasoning,
+            provider_used=llm_service.providers.get(provider or llm_service.default_provider, {}).get_provider_name() if llm_service.providers else "Fallback",
+            processing_time=processing_time
+        )
+        
+    except Exception as e:
+        processing_time = time.time() - start_time
+        logger.error(f"Error processing network query: {e}")
+        
+        return NetworkQueryResponse(
+            success=False,
+            query_type="error",
+            title="Query Processing Error",
+            summary="Failed to process your query. Please try again.",
+            visualization_type="text",
+            data=None,
+            confidence=0.0,
+            error_message=str(e),
+            processing_time=processing_time
+        )
+
+async def _execute_api_calls(api_calls: List[Dict[str, Any]], user_id: str, db: DatabaseService) -> Any:
+    """Execute the API calls suggested by the LLM and return the data"""
+    
+    if not api_calls:
+        return None
+    
+    # For now, execute the first API call (can be extended to handle multiple calls)
+    api_call = api_calls[0]
+    endpoint = api_call.get("endpoint", "")
+    params = api_call.get("params", {})
+    
+    try:
+        if endpoint == "/api/v1/contacts/grouped-by-company":
+            # Get contacts grouped by company
+            require_title = params.get("require_title", True)
+            target_companies_only = params.get("target_companies_only", False)
+            
+            # Get user's target companies
+            target_companies = await db.get_target_companies_by_user_id(user_id)
+            company_names = [tc.company_name for tc in target_companies]
+            
+            # Build filters
+            base_filters = {"degree": 1}
+            
+            if target_companies_only and company_names:
+                base_filters["company"] = {"$in": company_names}
+            
+            if require_title:
+                base_filters["title"] = {
+                    "$exists": True,
+                    "$ne": "",
+                    "$not": {"$regex": "^\\s*$"}
+                }
+            
+            # Group contacts by company
+            pipeline = [
+                {"$match": base_filters},
+                {"$group": {
+                    "_id": "$company",
+                    "contacts": {"$push": "$$ROOT"},
+                    "count": {"$sum": 1}
+                }},
+                {"$sort": {"count": -1}}
+            ]
+            
+            # Apply limit if specified
+            limit = params.get("limit")
+            if limit:
+                pipeline.append({"$limit": limit})
+            
+            cursor = db.contacts_collection.aggregate(pipeline)
+            companies_data = {}
+            
+            async for group in cursor:
+                company_name = group["_id"]
+                contacts_data = group["contacts"]
+                
+                # Transform contacts
+                contacts = []
+                for doc in contacts_data:
+                    doc['id'] = str(doc['_id'])
+                    del doc['_id']
+                    contacts.append(Contact(**doc).dict())
+                
+                companies_data[company_name] = contacts
+            
+            return companies_data
+            
+        elif endpoint == "/api/v1/contacts/stats":
+            # Get contact statistics
+            total_contacts = await db.count_contacts()
+            
+            # Get latest upload record
+            latest_uploads = await db.get_file_upload_records(skip=0, limit=1)
+            latest_upload = latest_uploads[0] if latest_uploads else None
+            
+            return {
+                "totalActiveContacts": total_contacts,
+                "latestUpload": {
+                    "contactsImported": latest_upload.contactsImported if latest_upload else 0,
+                    "uploadedAt": latest_upload.uploadedAt.isoformat() if latest_upload else None,
+                    "fileName": latest_upload.fileName if latest_upload else None,
+                    "status": latest_upload.status if latest_upload else None
+                } if latest_upload else None
+            }
+            
+        elif endpoint == "/api/v1/contacts":
+            # Get contacts with filtering
+            filters = {}
+            company = params.get("company")
+            if company:
+                filters["company"] = {"$regex": company, "$options": "i"}
+            
+            limit = params.get("limit", 100)
+            contacts = await db.get_contacts(skip=0, limit=limit, filters=filters)
+            
+            return [contact.dict() for contact in contacts]
+            
+        else:
+            logger.warning(f"Unknown endpoint in API call: {endpoint}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error executing API call {endpoint}: {e}")
+        return None
+
+@app.get("/api/v1/network/providers")
+async def get_available_llm_providers():
+    """Get list of available LLM providers"""
+    try:
+        providers = llm_service.get_available_providers()
+        return {
+            "success": True,
+            "providers": providers,
+            "default_provider": llm_service.default_provider.value if llm_service.default_provider else None
+        }
+    except Exception as e:
+        logger.error(f"Error getting LLM providers: {e}")
+        return {
+            "success": False,
+            "providers": [],
+            "error": str(e)
+        }
 
 if __name__ == "__main__":
     import uvicorn

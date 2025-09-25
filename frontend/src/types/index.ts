@@ -226,3 +226,19 @@ export interface ToolOriginatedBadge {
   icon?: string;
   tooltip?: string;
 }
+
+// Grouped Company Data Types for Network Page
+export interface GroupedCompanyData {
+  company: string;
+  contacts: Contact[];
+  total_contacts: number;
+  is_target_company: boolean;
+}
+
+export interface GroupedContactsResponse {
+  grouped_contacts: GroupedCompanyData[];
+  total_contacts: number;
+  target_companies_count: number;
+  success: boolean;
+  message?: string;
+}

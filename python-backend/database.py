@@ -25,8 +25,10 @@ class DatabaseService:
         return contact
     
     async def get_contacts(self, skip: int = 0, limit: int = 100, filters: Optional[Dict] = None) -> List[Contact]:
-        """Get contacts with pagination and filtering"""
+        """Get contacts with pagination and filtering - only returns 1st degree connections"""
         query = filters or {}
+        # Always filter to only 1st degree connections
+        query["degree"] = 1
         cursor = self.contacts_collection.find(query).skip(skip).limit(limit)
         contacts = []
         async for doc in cursor:
@@ -70,8 +72,10 @@ class DatabaseService:
             return False
     
     async def count_contacts(self, filters: Optional[Dict] = None) -> int:
-        """Count contacts with optional filters"""
+        """Count contacts with optional filters - only counts 1st degree connections"""
         query = filters or {}
+        # Always filter to only 1st degree connections
+        query["degree"] = 1
         return await self.contacts_collection.count_documents(query)
     
     async def bulk_create_contacts(self, contacts: List[Contact]) -> List[Contact]:
