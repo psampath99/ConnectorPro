@@ -33,8 +33,8 @@ google-auth-oauthlib==0.7.1
 google-auth-httplib2==0.1.0
 google-api-python-client==2.70.0
 
-# Core dependencies (stable versions for Python 3.11)
-typing-extensions==4.4.0
+# Core dependencies (Python 3.13 compatible)
+typing-extensions==4.8.0
 starlette==0.22.0
 click==8.1.3
 python-dateutil==2.8.2
