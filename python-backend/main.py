@@ -91,7 +91,7 @@ app = FastAPI(
 )
 
 # Configure CORS
-cors_origins = ["http://localhost:5173", "http://localhost:5138", "http://localhost:5137", "http://localhost:5139", "http://localhost:5140", "http://localhost:5141", "http://127.0.0.1:5138", "http://127.0.0.1:5173", "http://127.0.0.1:5137", "http://127.0.0.1:5139", "http://127.0.0.1:5140", "http://127.0.0.1:5141"]
+cors_origins = ["http://localhost:5173", "http://localhost:5138", "http://localhost:5137", "http://localhost:5139", "http://localhost:5140", "http://localhost:5141", "http://127.0.0.1:5138", "http://127.0.0.1:5173", "http://127.0.0.1:5137", "http://127.0.0.1:5139", "http://127.0.0.1:5140", "http://127.0.0.1:5141", "https://connectorpro.onrender.com"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
