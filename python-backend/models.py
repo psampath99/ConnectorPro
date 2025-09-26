@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -38,8 +38,6 @@ class GmailScope(str, Enum):
     USERINFO_EMAIL = "https://www.googleapis.com/auth/userinfo.email"
 
 class Contact(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    
     id: Optional[str] = None
     name: str
     title: Optional[str] = None
@@ -49,18 +47,16 @@ class Contact(BaseModel):
     linkedinUrl: Optional[str] = None
     degree: Optional[ContactDegree] = ContactDegree.FIRST  # Default to 1st degree connections
     relationshipStrength: Optional[RelationshipStrength] = RelationshipStrength.MEDIUM
-    commonalities: Optional[List[str]] = Field(default_factory=list)
+    commonalities: Optional[List[str]] = []
     notes: Optional[str] = ""
-    tags: Optional[List[str]] = Field(default_factory=list)
+    tags: Optional[List[str]] = []
     addedAt: Optional[datetime] = Field(default_factory=datetime.now)
     lastContact: Optional[datetime] = None
-    linkedinData: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    linkedinData: Optional[Dict[str, Any]] = {}
     createdAt: Optional[datetime] = Field(default_factory=datetime.now)
     updatedAt: Optional[datetime] = Field(default_factory=datetime.now)
 
 class FileUploadRecord(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    
     id: Optional[str] = None
     fileName: str
     fileSize: int
@@ -72,7 +68,7 @@ class FileUploadRecord(BaseModel):
     errorMessage: Optional[str] = None
     uploadedAt: datetime = Field(default_factory=datetime.now)
     updatedAt: datetime = Field(default_factory=datetime.now)
-    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    metadata: Optional[Dict[str, Any]] = {}
 
 class CSVImportRequest(BaseModel):
     overwriteExisting: Optional[bool] = False
@@ -89,16 +85,14 @@ class ContactsResponse(BaseModel):
     limit: int
 
 class ImportResponse(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    
     success: bool
     message: str
     imported: int
     total: int
-    contacts: Optional[List[Any]] = Field(default_factory=list)  # Allow flexible contact data for frontend compatibility
+    contacts: Optional[List[Any]] = []  # Allow flexible contact data for frontend compatibility
     uploadId: Optional[str] = None
     processingDuration: Optional[float] = None
-    errors: Optional[List[str]] = Field(default_factory=list)
+    errors: Optional[List[str]] = []
 
 class FileUploadsResponse(BaseModel):
     uploads: List[FileUploadRecord]
@@ -111,8 +105,6 @@ class LinkedInStatusResponse(BaseModel):
 
 # Gmail Integration Models
 class GmailConnection(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    
     id: Optional[str] = None
     user_id: str
     email_address: str
@@ -127,8 +119,6 @@ class GmailConnection(BaseModel):
     error_message: Optional[str] = None
 
 class GmailEmail(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    
     id: str
     thread_id: str
     subject: str
@@ -138,7 +128,7 @@ class GmailEmail(BaseModel):
     snippet: str
     body_text: Optional[str] = None
     body_html: Optional[str] = None
-    labels: List[str] = Field(default_factory=list)
+    labels: List[str] = []
     is_read: bool = False
     is_important: bool = False
     has_attachments: bool = False
@@ -186,18 +176,14 @@ class GmailSendResponse(BaseModel):
 
 # Enhanced filtering models
 class UserTargetCompany(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    
     id: Optional[str] = None
     user_id: str
     company_name: str
-    company_domains: Optional[List[str]] = Field(default_factory=list)  # Optional explicit domains
+    company_domains: Optional[List[str]] = []  # Optional explicit domains
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
 class ToolOriginatedMessage(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    
     id: Optional[str] = None
     user_id: str
     message_id: str  # Gmail message ID
@@ -213,10 +199,8 @@ class EnhancedGmailEmail(GmailEmail):
     tool_name: Optional[str] = None
 
 class TargetCompanyRequest(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    
     company_name: str
-    company_domains: Optional[List[str]] = Field(default_factory=list)
+    company_domains: Optional[List[str]] = []
 
 class TargetCompanyResponse(BaseModel):
     success: bool
@@ -235,10 +219,8 @@ class EnhancedEmailsResponse(BaseModel):
 
 # LLM Network Query Models
 class NetworkQueryRequest(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    
     query: str
-    conversation_history: Optional[List[Dict[str, str]]] = Field(default_factory=list)
+    conversation_history: Optional[List[Dict[str, str]]] = []
     provider: Optional[str] = None  # "openai", "anthropic", "local"
 
 class NetworkQueryResponse(BaseModel):
