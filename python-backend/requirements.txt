@@ -1,11 +1,11 @@
-# Ultra-minimal FastAPI setup - NO COMPILATION REQUIRED
-# This avoids ALL C/Rust compilation issues on Python 3.13
+# Python 3.13 compatible FastAPI setup - NO COMPILATION REQUIRED
+# Updated versions to fix ForwardRef._evaluate() compatibility issues
 
-# Core FastAPI (pure Python)
-fastapi==0.104.1
+# Core FastAPI (Python 3.13 compatible)
+fastapi==0.108.0
 
 # ASGI server (pure Python implementation)
-uvicorn==0.24.0
+uvicorn==0.25.0
 
 # Database (pure Python)
 motor==3.3.2
@@ -14,8 +14,8 @@ pymongo==4.6.0
 # Configuration
 python-dotenv==1.0.0
 
-# Data validation (pure Python, no Rust)
-pydantic==1.10.12
+# Data validation (Python 3.13 compatible)
+pydantic==2.5.0
 
 # Authentication (minimal, no cryptography)
 PyJWT==2.8.0
@@ -36,7 +36,6 @@ google-api-python-client==2.108.0
 
 # Core dependencies (pure Python only)
 typing-extensions==4.8.0
-starlette==0.27.0
 click==8.1.7
 python-dateutil==2.8.2
 six==1.16.0
