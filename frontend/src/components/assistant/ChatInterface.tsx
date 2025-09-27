@@ -55,131 +55,6 @@ export function ChatInterface({ conversation, onNewConversation }: ChatInterface
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const generateAIResponse = (userMessage: string): Message => {
-    const lowerMessage = userMessage.toLowerCase();
-    
-    // Simulate AI responses based on common networking queries
-    let content = '';
-    let metadata = {};
-
-    if (lowerMessage.includes('stripe') && (lowerMessage.includes('best people') || lowerMessage.includes('who'))) {
-      content = `I found 3 relevant people at Stripe for product marketing roles! Here are your top targets with the strongest introduction paths:
-
-**1. Sarah Chen, Senior Product Marketing Manager**
-- Best bridge: Alex Kumar (your ex-Google colleague, 2019-2021 overlap)
-- Commonality: Both worked on Google Ads team
-- Confidence: 95%
-
-**2. Mike Rodriguez, VP Product Marketing** 
-- Best bridge: Priya Patel (UCLA '18 classmate, both in Marketing Club)
-- Commonality: UCLA alumni connection
-- Confidence: 90%
-
-**3. Jennifer Liu, Product Marketing Lead**
-- Best bridge: David Park (mutual connection through RevOps Collective)
-- Commonality: RevOps community members
-- Confidence: 80%
-
-Would you like me to draft an introduction request for any of these paths?`;
-      
-      metadata = {
-        contacts: ['contact-1', 'contact-2', 'contact-3'],
-        bridges: ['bridge-1', 'bridge-2']
-      };
-    } else if (lowerMessage.includes('draft') && lowerMessage.includes('intro')) {
-      content = `Perfect! I'll create an introduction request for Alex that highlights your shared Google experience. Here's a draft that leads with your strongest commonality:
-
-**Subject:** Quick intro request - fellow Google Ads alum
-
-**Message:**
-Hi Alex,
-
-Hope you're doing well! I'm reaching out because I remember you mentioning your connection to Stripe during our Google days. I'm exploring product marketing opportunities and would love a brief intro to Sarah Chen if you think it makes sense.
-
-We both worked on the Google Ads team (you were there when I joined in 2019), so I thought you'd be a credible bridge. Happy to send more context if helpful.
-
-Thanks for considering!
-- Maya
-
-Would you prefer to send this via LinkedIn or Gmail?`;
-      
-      metadata = {
-        drafts: ['draft-1']
-      };
-    } else if (lowerMessage.includes('gmail') || lowerMessage.includes('email')) {
-      content = `Great choice! I'll prepare this for Gmail. Here's what happens next:
-
-1. **Confirm recipient**: I'll need you to confirm Alex's email address
-2. **Review draft**: You can edit the message before sending
-3. **Send**: Click "Send via Gmail" when ready
-
-After Sarah responds positively, I can help you set up a 20-minute intro call with a Google Meet link. The meeting invite will reference your Google connection and product marketing focus.
-
-Ready to proceed with the Gmail introduction?`;
-    } else if (lowerMessage.includes('meeting') || lowerMessage.includes('schedule')) {
-      content = `I can help you schedule a meeting! Here are the options:
-
-**For Sarah Chen (after successful introduction):**
-- 30-minute intro call
-- Google Meet link included
-- Suggested agenda: Product marketing role discussion
-
-**For Alex Kumar (immediate):**
-- Coffee chat to catch up
-- 45-minute duration
-- Discuss networking opportunities
-
-Would you like me to set up either of these meetings?`;
-    } else if (lowerMessage.includes('help') || lowerMessage.includes('what can you do')) {
-      content = `I'm your AI networking assistant! Here's how I can help:
-
-**🎯 Find the right people:**
-- "Who are the best people at [Company] to connect with?"
-- "Show me product marketing contacts at Stripe"
-
-**🌉 Identify bridge paths:**
-- "What's the best way to reach Sarah Chen?"
-- "Who can introduce me to people at Meta?"
-
-**✍️ Draft personalized messages:**
-- "Draft an intro request via Alex for Sarah"
-- "Create a LinkedIn message to Mike Rodriguez"
-
-**📅 Schedule meetings:**
-- "Book a meeting with Alex Kumar"
-- "Set up intro call with Sarah Chen"
-
-**📋 Manage follow-ups:**
-- "Remind me to follow up with Priya"
-- "What tasks do I have this week?"
-
-Try asking me about specific companies or people you want to connect with!`;
-    } else {
-      content = `I understand you're asking about "${userMessage}". Let me help you with that!
-
-To give you the most relevant networking recommendations, could you be more specific about:
-
-- Which company or person you're interested in connecting with
-- What type of role or opportunity you're exploring
-- Whether you need help with introductions, drafting messages, or scheduling meetings
-
-For example, you could ask:
-- "Who are the best people at [Company] to connect with?"
-- "Draft an introduction request for [Person]"
-- "Schedule a meeting with [Contact]"
-
-What would you like to focus on?`;
-    }
-
-    return {
-      id: `msg-${Date.now()}`,
-      role: 'assistant',
-      content,
-      timestamp: new Date(),
-      metadata
-    };
-  };
-
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -281,55 +156,45 @@ What would you like to focus on?`;
     setImageErrors([]); // Clear any errors
     setIsTyping(true);
 
-    // Simulate AI thinking time with image analysis
-    setTimeout(() => {
-      let aiResponseContent = '';
-      
-      if (messageImages.length > 0) {
-        aiResponseContent = `I can see you've shared ${messageImages.length} image${messageImages.length > 1 ? 's' : ''} with me. `;
-        
-        // Add information about image processing
-        const resizedCount = messageImages.filter(img => img.wasResized).length;
-        if (resizedCount > 0) {
-          aiResponseContent += `${resizedCount} image${resizedCount > 1 ? 's were' : ' was'} automatically resized to meet API requirements (max 2000px). `;
-        }
-        
-        aiResponseContent += `In a real implementation, I would analyze these images using vision AI capabilities. `;
-        
-        if (inputValue) {
-          aiResponseContent += `Regarding your message: "${inputValue}" - I would provide context-aware responses based on both the text and image content.`;
-        } else {
-          aiResponseContent += `What would you like me to help you with regarding these images?`;
-        }
-      } else {
-        aiResponseContent = generateAIResponse(inputValue).content;
+    try {
+      const response = await fetch('http://localhost:8000/api/v1/network/query', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: inputValue }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch');
       }
 
+      const data = await response.json();
       const aiResponse: Message = {
         id: `msg-${Date.now()}`,
         role: 'assistant',
-        content: aiResponseContent,
+        content: data.summary || 'Here is the data you requested.',
         timestamp: new Date(),
-        metadata: messageImages.length > 0 ? { hasImageAnalysis: true } : undefined
+        metadata: undefined,
       };
-
+      
       const updatedMessages = [...newMessages, aiResponse];
       setMessages(updatedMessages);
-      setIsTyping(false);
 
-      // Save conversation
-      const newConversation: Conversation = {
-        id: conversation?.id || `conv-${Date.now()}`,
-        messages: updatedMessages,
-        createdAt: conversation?.createdAt || new Date(),
-        updatedAt: new Date(),
-        topic: updatedMessages[0]?.content.slice(0, 50) + '...'
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      const errorResponse: Message = {
+        id: `msg-${Date.now()}`,
+        role: 'assistant',
+        content: `Query Processing Error: ${errorMessage}. Please try again or rephrase your question.`,
+        timestamp: new Date(),
+        metadata: undefined,
       };
-
-      if (!conversation) {
-        onNewConversation(newConversation);
-      }
-    }, 1000 + Math.random() * 1000);
+      const updatedMessages = [...newMessages, errorResponse];
+      setMessages(updatedMessages);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
