@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { LinkedInIntegration } from '@/components/integrations/LinkedInIntegration';
 import { CSVImport } from '@/components/integrations/CSVImport';
@@ -555,48 +556,57 @@ const Settings = () => {
                   <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600"></div>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Message Tone */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-800 mb-2">
-                        Default Message Tone
-                      </label>
-                      <Select 
-                        value={user.preferences.draftTone} 
-                        onValueChange={(value: any) => updateUserPreferences({ draftTone: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="professional">Professional - Formal and business-focused</SelectItem>
-                          <SelectItem value="friendly">Friendly - Warm and approachable</SelectItem>
-                          <SelectItem value="concise">Concise - Brief and to the point</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <Tabs defaultValue="general" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="general">General</TabsTrigger>
+                      <TabsTrigger value="message-tone">Message Tone</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="general" className="space-y-6">
+                      {/* Reminder Frequency */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-800 mb-2">
+                          Follow-up Reminder Frequency
+                        </label>
+                        <Select
+                          value={user.preferences.reminderFrequency.toString()}
+                          onValueChange={(value) => updateUserPreferences({ reminderFrequency: parseInt(value) })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="3">Every 3 days</SelectItem>
+                            <SelectItem value="7">Every week</SelectItem>
+                            <SelectItem value="14">Every 2 weeks</SelectItem>
+                            <SelectItem value="30">Every month</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </TabsContent>
 
-                    {/* Reminder Frequency */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-800 mb-2">
-                        Follow-up Reminder Frequency
-                      </label>
-                      <Select 
-                        value={user.preferences.reminderFrequency.toString()} 
-                        onValueChange={(value) => updateUserPreferences({ reminderFrequency: parseInt(value) })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="3">Every 3 days</SelectItem>
-                          <SelectItem value="7">Every week</SelectItem>
-                          <SelectItem value="14">Every 2 weeks</SelectItem>
-                          <SelectItem value="30">Every month</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+                    <TabsContent value="message-tone" className="space-y-6">
+                      {/* Message Tone */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-800 mb-2">
+                          Default Message Tone
+                        </label>
+                        <Select
+                          value={user.preferences.draftTone}
+                          onValueChange={(value: any) => updateUserPreferences({ draftTone: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="professional">Professional - Formal and business-focused</SelectItem>
+                            <SelectItem value="friendly">Friendly - Warm and approachable</SelectItem>
+                            <SelectItem value="concise">Concise - Brief and to the point</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
 
                   {/* Commonality Priority Order */}
                   <div>
