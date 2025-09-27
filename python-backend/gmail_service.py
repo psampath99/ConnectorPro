@@ -70,29 +70,39 @@ class GmailService:
     
     def _load_credentials(self):
         """Load credentials from environment variables"""
+        # Force reload .env file to pick up changes
+        from dotenv import load_dotenv
+        load_dotenv(override=True)
+        
         self._client_id = os.getenv("GOOGLE_CLIENT_ID")
         self._client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
         self._redirect_uri = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/v1/gmail/callback")
+        
+        # DEBUG LOGGING: Log loaded credentials
+        logger.info(f"🔍 DEBUG - Loading OAuth credentials from environment (with .env reload):")
+        logger.info(f"🔍 DEBUG - GOOGLE_CLIENT_ID: {self._client_id}")
+        logger.info(f"🔍 DEBUG - GOOGLE_CLIENT_SECRET configured: {bool(self._client_secret)}")
+        logger.info(f"🔍 DEBUG - GOOGLE_REDIRECT_URI: {self._redirect_uri}")
         
         if not self._client_id or not self._client_secret:
             logger.warning("Google OAuth credentials not configured. Gmail integration will not work.")
     
     @property
     def client_id(self):
-        if not self._client_id:
-            self._load_credentials()
+        # Always reload credentials to pick up environment changes
+        self._load_credentials()
         return self._client_id
     
     @property
     def client_secret(self):
-        if not self._client_secret:
-            self._load_credentials()
+        # Always reload credentials to pick up environment changes
+        self._load_credentials()
         return self._client_secret
     
     @property
     def redirect_uri(self):
-        if not self._redirect_uri:
-            self._load_credentials()
+        # Always reload credentials to pick up environment changes
+        self._load_credentials()
         return self._redirect_uri
     
     def get_authorization_url(self, user_id: str, scopes: Optional[List[str]] = None) -> str:
@@ -101,6 +111,15 @@ class GmailService:
             raise ValueError("Google OAuth credentials not configured")
         
         scopes = scopes or self.default_scopes
+        
+        # DEBUG LOGGING: Log all OAuth configuration details
+        logger.info("🔍 DEBUG - OAuth URL Generation Starting")
+        logger.info(f"🔍 DEBUG - Client ID: {self.client_id}")
+        logger.info(f"🔍 DEBUG - Client ID ends with .apps.googleusercontent.com: {self.client_id.endswith('.apps.googleusercontent.com') if self.client_id else False}")
+        logger.info(f"🔍 DEBUG - Client Secret configured: {bool(self.client_secret)}")
+        logger.info(f"🔍 DEBUG - Redirect URI: {self.redirect_uri}")
+        logger.info(f"🔍 DEBUG - User ID (state): {user_id}")
+        logger.info(f"🔍 DEBUG - Requested scopes: {scopes}")
         
         # No longer filter out "openid" since we now explicitly include it in default_scopes
         
@@ -125,6 +144,49 @@ class GmailService:
             state=user_id,
             prompt='consent'  # Force consent to get refresh token
         )
+        
+        # DEBUG LOGGING: Log the complete generated URL and its components
+        logger.info(f"🔍 DEBUG - Generated OAuth URL: {auth_url}")
+        
+        # Parse and log URL components for detailed analysis
+        from urllib.parse import urlparse, parse_qs
+        parsed_url = urlparse(auth_url)
+        query_params = parse_qs(parsed_url.query)
+        
+        logger.info("🔍 DEBUG - OAuth URL Components:")
+        logger.info(f"  - Base URL: {parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}")
+        logger.info(f"  - response_type: {query_params.get('response_type', ['NOT_SET'])}")
+        logger.info(f"  - client_id: {query_params.get('client_id', ['NOT_SET'])}")
+        logger.info(f"  - redirect_uri: {query_params.get('redirect_uri', ['NOT_SET'])}")
+        logger.info(f"  - scope: {query_params.get('scope', ['NOT_SET'])}")
+        logger.info(f"  - state: {query_params.get('state', ['NOT_SET'])}")
+        logger.info(f"  - access_type: {query_params.get('access_type', ['NOT_SET'])}")
+        logger.info(f"  - prompt: {query_params.get('prompt', ['NOT_SET'])}")
+        
+        # Check for proper URL encoding
+        import urllib.parse
+        if 'scope' in query_params:
+            raw_scope = query_params['scope'][0] if query_params['scope'] else ''
+            logger.info(f"🔍 DEBUG - Raw scope parameter: {raw_scope}")
+            logger.info(f"🔍 DEBUG - Scope is URL encoded: {raw_scope != urllib.parse.unquote(raw_scope)}")
+        
+        # Validate critical parameters
+        validation_errors = []
+        if not query_params.get('client_id'):
+            validation_errors.append("Missing client_id parameter")
+        elif not query_params['client_id'][0].endswith('.apps.googleusercontent.com'):
+            validation_errors.append(f"Invalid client_id format: {query_params['client_id'][0]}")
+        
+        if not query_params.get('redirect_uri'):
+            validation_errors.append("Missing redirect_uri parameter")
+        
+        if not query_params.get('scope'):
+            validation_errors.append("Missing scope parameter")
+        
+        if validation_errors:
+            logger.error(f"🔍 DEBUG - OAuth URL Validation Errors: {validation_errors}")
+        else:
+            logger.info("🔍 DEBUG - OAuth URL validation passed")
         
         return auth_url
     

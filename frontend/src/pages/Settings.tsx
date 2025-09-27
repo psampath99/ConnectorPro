@@ -75,6 +75,10 @@ const Settings = () => {
     error_message?: string;
   } | null>(null);
 
+  // Provider selection state
+  const [selectedEmailProvider, setSelectedEmailProvider] = useState<string>('Gmail');
+  const [selectedCalendarProvider, setSelectedCalendarProvider] = useState<string>('Google');
+
   // Fetch target companies from backend API (similar to Network page)
   const fetchTargetCompanies = async () => {
     try {
@@ -769,7 +773,7 @@ const Settings = () => {
                     <div className="flex items-center justify-between mb-6">
                       <div className="flex items-center space-x-2">
                         <Mail className="w-5 h-5 text-gray-700" />
-                        <span className="text-lg font-medium text-gray-900">Email</span>
+                        <span className="text-lg font-medium text-gray-900">Email ({selectedEmailProvider})</span>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
@@ -777,20 +781,20 @@ const Settings = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="start">
-                            <DropdownMenuItem onClick={() => console.log('Yahoo! selected')}>
+                            <DropdownMenuItem onClick={() => setSelectedEmailProvider('Yahoo!')}>
                               Yahoo!
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => console.log('Gmail selected')}>
+                            <DropdownMenuItem onClick={() => setSelectedEmailProvider('Gmail')}>
                               Gmail
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => console.log('Outlook selected')}>
+                            <DropdownMenuItem onClick={() => setSelectedEmailProvider('Outlook')}>
                               Outlook
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
                       <Button
-                        onClick={async () => {
+                        onClick={selectedEmailProvider === 'Gmail' ? async () => {
                           // Simple connect action - just trigger the Gmail connection
                           try {
                             const response = await fetch('http://localhost:8000/api/v1/gmail/auth-url', {
@@ -850,11 +854,17 @@ const Settings = () => {
                           } catch (error) {
                             alert('Failed to connect to Gmail: ' + (error instanceof Error ? error.message : 'Unknown error'));
                           }
-                        }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
-                        disabled={gmailStatus?.status === 'connected'}
+                        } : undefined}
+                        className={selectedEmailProvider === 'Gmail'
+                          ? "bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
+                          : "bg-gray-400 text-gray-600 px-6 py-2 cursor-not-allowed"
+                        }
+                        disabled={selectedEmailProvider !== 'Gmail' || gmailStatus?.status === 'connected'}
                       >
-                        {gmailStatus?.status === 'connected' ? 'Connected' : 'Connect'}
+                        {selectedEmailProvider === 'Gmail'
+                          ? (gmailStatus?.status === 'connected' ? 'Connected' : 'Connect')
+                          : 'Not Supported'
+                        }
                       </Button>
                     </div>
                     <div className="h-0.5 bg-blue-600 mb-4"></div>
@@ -877,7 +887,7 @@ const Settings = () => {
                     <div className="flex items-center justify-between mb-6">
                       <div className="flex items-center space-x-2">
                         <Calendar className="w-5 h-5 text-gray-700" />
-                        <span className="text-lg font-medium text-gray-900">Calendar</span>
+                        <span className="text-lg font-medium text-gray-900">Calendar ({selectedCalendarProvider})</span>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
@@ -885,20 +895,20 @@ const Settings = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="start">
-                            <DropdownMenuItem onClick={() => console.log('Google selected')}>
+                            <DropdownMenuItem onClick={() => setSelectedCalendarProvider('Google')}>
                               Google
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => console.log('Outlook selected')}>
+                            <DropdownMenuItem onClick={() => setSelectedCalendarProvider('Outlook')}>
                               Outlook
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => console.log('iCloud selected')}>
+                            <DropdownMenuItem onClick={() => setSelectedCalendarProvider('iCloud')}>
                               iCloud
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
                       <Button
-                        onClick={async () => {
+                        onClick={selectedCalendarProvider === 'Google' ? async () => {
                           // Simple connect action - just trigger the Calendar connection
                           try {
                             const response = await fetch('http://localhost:8000/api/v1/calendar/auth-url', {
@@ -987,11 +997,17 @@ const Settings = () => {
                           } catch (error) {
                             alert('Failed to connect to Calendar: ' + (error instanceof Error ? error.message : 'Unknown error'));
                           }
-                        }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
-                        disabled={calendarStatus?.status === 'connected'}
+                        } : undefined}
+                        className={selectedCalendarProvider === 'Google'
+                          ? "bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
+                          : "bg-gray-400 text-gray-600 px-6 py-2 cursor-not-allowed"
+                        }
+                        disabled={selectedCalendarProvider !== 'Google' || calendarStatus?.status === 'connected'}
                       >
-                        {calendarStatus?.status === 'connected' ? 'Connected' : 'Connect'}
+                        {selectedCalendarProvider === 'Google'
+                          ? (calendarStatus?.status === 'connected' ? 'Connected' : 'Connect')
+                          : 'Not Supported'
+                        }
                       </Button>
                     </div>
                     <div className="h-0.5 bg-blue-600 mb-4"></div>

@@ -1178,6 +1178,7 @@ async def get_gmail_auth_url(current_user: dict = Depends(get_current_user)):
     try:
         user_id = current_user.get("user_id", "demo-user")
         auth_url = gmail_service.get_authorization_url(user_id)
+        logger.info(f"Generated Gmail Auth URL: {auth_url}")
         
         return GmailConnectionResponse(
             success=True,
