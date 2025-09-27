@@ -1158,6 +1158,27 @@ const Settings = () => {
                         </p>
                       )}
                     </div>
+
+                    {/* Schedule and Meetings Buttons - Only show when Calendar is connected */}
+                    {calendarStatus?.status === 'connected' && (
+                      <div className="mt-4 flex space-x-3">
+                        <Button
+                          onClick={() => navigate('/meetings')}
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm"
+                        >
+                          <Calendar className="w-4 h-4 mr-2" />
+                          Schedule
+                        </Button>
+                        <Button
+                          onClick={() => navigate('/meetings')}
+                          variant="outline"
+                          className="border-blue-600 text-blue-600 hover:bg-blue-50 px-4 py-2 text-sm"
+                        >
+                          <Calendar className="w-4 h-4 mr-2" />
+                          Meetings
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
