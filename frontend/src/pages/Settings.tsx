@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { LinkedInIntegration } from '@/components/integrations/LinkedInIntegration';
 import { CSVImport } from '@/components/integrations/CSVImport';
 import { FileUploadHistory } from '@/components/integrations/FileUploadHistory';
@@ -31,8 +32,10 @@ import {
   GripVertical,
   ChevronUp,
   ChevronDown,
-  FileText
+  FileText,
+  ChevronDown as ChevronDownIcon
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const commonCompanies = [
   'Google', 'Meta', 'Apple', 'Microsoft', 'Amazon', 'Netflix', 'Tesla', 'Stripe', 
@@ -749,263 +752,266 @@ const Settings = () => {
               </CardContent>
             </Card>
 
-            {/* Gmail Integration */}
-            <Card>
-              <CardHeader className="relative">
-                <CardTitle className="flex items-center space-x-2" style={{ marginBottom: '1px' }}>
-                  <Mail className="w-5 h-5" />
-                  <span>Gmail Integration</span>
-                </CardTitle>
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-blue-50 rounded-lg p-4 mb-6">
-                  <div className="flex items-start space-x-2">
-                    <Info className="w-5 h-5 text-blue-600 mt-0.5" />
-                    <div>
-                      <h4 className="font-medium text-blue-900 mb-1">Connect Your Gmail Account</h4>
-                      <p className="text-sm text-blue-800">
-                        Connect Gmail to send personalized introduction requests and follow-up emails directly from ConnectorPro.
-                        Your emails will be sent from your own Gmail account with full tracking and organization.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <GmailIntegration
-                  onConnectionChange={() => {
-                    // Refresh Gmail status when connection changes
-                    fetchGmailStatus();
-                  }}
-                />
-              </CardContent>
-            </Card>
-
-            {/* Google Calendar Integration */}
-            <Card>
-              <CardHeader className="relative">
-                <CardTitle className="flex items-center space-x-2" style={{ marginBottom: '1px' }}>
-                  <Calendar className="w-5 h-5" />
-                  <span>Google Calendar Integration</span>
-                </CardTitle>
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-blue-50 rounded-lg p-4 mb-6">
-                  <div className="flex items-start space-x-2">
-                    <Info className="w-5 h-5 text-blue-600 mt-0.5" />
-                    <div>
-                      <h4 className="font-medium text-blue-900 mb-1">Connect Your Google Calendar</h4>
-                      <p className="text-sm text-blue-800">
-                        Connect Google Calendar to schedule meetings, create events, and manage your calendar directly from ConnectorPro.
-                        Perfect for scheduling networking meetings and follow-ups.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <CalendarIntegration
-                  onConnectionChange={() => {
-                    // Refresh Calendar status when connection changes
-                    fetchCalendarStatus();
-                  }}
-                />
-              </CardContent>
-            </Card>
-
-            {/* Connected Integrations */}
+            {/* Email and Calendar Integration */}
             <Card>
               <CardHeader className="relative">
                 <CardTitle className="flex items-center space-x-2" style={{ marginBottom: '1px' }}>
                   <CheckCircle className="w-5 h-5" />
-                  <span>Integration Status</span>
+                  <span>Email and Calendar Integration</span>
                 </CardTitle>
                 <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600"></div>
               </CardHeader>
-              <CardContent>
-               <div className="space-y-4" key={refreshTrigger}>
-                 {/* LinkedIn Integration */}
-                 <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                        <Building2 className="w-5 h-5 text-white" />
+              <CardContent className="space-y-6">
+                {/* Two Panels Layout */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Left Panel - Email */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center space-x-2">
+                        <Mail className="w-5 h-5 text-gray-700" />
+                        <span className="text-lg font-medium text-gray-900">Email</span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                              <ChevronDownIcon className="w-4 h-4 text-gray-600" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            <DropdownMenuItem onClick={() => console.log('Yahoo! selected')}>
+                              Yahoo!
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => console.log('Gmail selected')}>
+                              Gmail
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => console.log('Outlook selected')}>
+                              Outlook
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
-                      <div>
-                        <h3 className="font-medium text-gray-900">LinkedIn</h3>
-                        <p className="text-sm text-gray-800">Network analysis and contact import</p>
-                        <p className="text-xs text-gray-600 mt-1">
-                          Last imported: {(() => {
-                            // Check new file upload history first (most recent method)
-                            const fileUploadHistory = storage.getFileUploadHistory();
-                            if (fileUploadHistory && fileUploadHistory.length > 0) {
-                              // Get the most recent successful upload (regardless of contacts imported count)
-                              const latestUpload = fileUploadHistory
-                                .filter(upload => upload.status === 'success')
-                                .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0];
-                              
-                              if (latestUpload) {
-                                return new Date(latestUpload.uploadedAt).toLocaleString();
+                      <Button
+                        onClick={async () => {
+                          // Simple connect action - just trigger the Gmail connection
+                          try {
+                            const response = await fetch('http://localhost:8000/api/v1/gmail/auth-url', {
+                              method: 'GET',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${localStorage.getItem('accessToken') || 'demo-token'}`
                               }
+                            });
+
+                            if (!response.ok) {
+                              throw new Error('Failed to get Gmail authorization URL');
                             }
+
+                            const data = await response.json();
                             
-                            // Fallback to old methods for backward compatibility
-                            const csvUploadState = storage.getCsvUploadState();
-                            const onboardingData = storage.getOnboardingData();
-                            
-                            if (csvUploadState && csvUploadState.csvUploadTimestamp) {
-                              return new Date(csvUploadState.csvUploadTimestamp).toLocaleString();
-                            } else if (onboardingData && onboardingData.csvUploadTimestamp) {
-                              return new Date(onboardingData.csvUploadTimestamp).toLocaleString();
-                            } else {
-                              const uploadedFiles = storage.getUploadedFiles();
-                              if (uploadedFiles && uploadedFiles.length > 0) {
-                                const latestFile = uploadedFiles.sort((a, b) =>
-                                  new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-                                )[0];
-                                return new Date(latestFile.uploadedAt).toLocaleString();
+                            if (data.success && data.auth_url) {
+                              // Open authorization URL in new window
+                              const authWindow = window.open(
+                                data.auth_url,
+                                'gmail-auth',
+                                'width=500,height=600,scrollbars=yes,resizable=yes'
+                              );
+
+                              if (!authWindow) {
+                                alert('Failed to open authorization window. Please allow popups and try again.');
+                                return;
                               }
-                              return 'Never';
+
+                              // Listen for messages from the callback page
+                              const handleMessage = (event: MessageEvent) => {
+                                if (event.origin !== window.location.origin) {
+                                  return;
+                                }
+
+                                if (event.data && event.data.type === 'GMAIL_AUTH_SUCCESS') {
+                                  authWindow.close();
+                                  fetchGmailStatus();
+                                  window.removeEventListener('message', handleMessage);
+                                } else if (event.data && event.data.type === 'GMAIL_AUTH_ERROR') {
+                                  authWindow.close();
+                                  alert(event.data.message || 'Gmail authorization failed');
+                                  window.removeEventListener('message', handleMessage);
+                                }
+                              };
+
+                              window.addEventListener('message', handleMessage);
+
+                              // Cleanup after 5 minutes
+                              setTimeout(() => {
+                                if (authWindow && !authWindow.closed) {
+                                  authWindow.close();
+                                }
+                                window.removeEventListener('message', handleMessage);
+                              }, 300000);
                             }
-                          })()}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <Badge className="bg-green-100 text-green-800 mb-1">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Connected
-                      </Badge>
-                      <div className="text-xs text-gray-600 space-y-1">
-                        <p>Total active contacts: {contactStats.totalActiveContacts}</p>
-                        {(() => {
-                          // Get the most recent successful upload for new contacts info
-                          const fileUploadHistory = storage.getFileUploadHistory();
-                          
-                          if (fileUploadHistory && fileUploadHistory.length > 0) {
-                            const latestUpload = fileUploadHistory
-                              .filter(upload => upload.status === 'success')
-                              .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0];
-                            
-                            if (latestUpload) {
-                              const imported = latestUpload.contactsImported || 0;
-                              if (imported > 0) {
-                                return <p>Last upload: {imported} new contacts added</p>;
-                              } else {
-                                return <p>Last upload: 0 new contacts (all duplicates)</p>;
-                              }
-                            }
+                          } catch (error) {
+                            alert('Failed to connect to Gmail: ' + (error instanceof Error ? error.message : 'Unknown error'));
                           }
-                          
-                          return <p>No recent uploads</p>;
-                        })()}
-                      </div>
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
+                        disabled={gmailStatus?.status === 'connected'}
+                      >
+                        {gmailStatus?.status === 'connected' ? 'Connected' : 'Connect'}
+                      </Button>
+                    </div>
+                    <div className="h-0.5 bg-blue-600 mb-4"></div>
+                    
+                    {/* Email Connection Status */}
+                    <div className="mb-4">
+                      <p className="text-sm text-gray-600">
+                        {gmailStatus?.status === 'connected' && gmailStatus.email_address
+                          ? `Last connected: ${gmailStatus.email_address}`
+                          : gmailStatus?.status === 'connected' && gmailStatus.last_connected
+                          ? `Last connected: ${new Date(gmailStatus.last_connected).toLocaleString()}`
+                          : 'Last connected: Never'
+                        }
+                      </p>
                     </div>
                   </div>
 
-                  {/* Gmail Integration */}
-                  <div className={`flex items-center justify-between p-4 rounded-lg border ${
-                    gmailStatus?.status === 'connected'
-                      ? 'bg-green-50 border-green-200'
-                      : 'bg-gray-50 border-gray-200'
-                  }`}>
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        gmailStatus?.status === 'connected'
-                          ? 'bg-red-600'
-                          : 'bg-gray-400'
-                      }`}>
-                        <Mail className="w-5 h-5 text-white" />
+                  {/* Right Panel - Calendar */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center space-x-2">
+                        <Calendar className="w-5 h-5 text-gray-700" />
+                        <span className="text-lg font-medium text-gray-900">Calendar</span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                              <ChevronDownIcon className="w-4 h-4 text-gray-600" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            <DropdownMenuItem onClick={() => console.log('Google selected')}>
+                              Google
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => console.log('Outlook selected')}>
+                              Outlook
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => console.log('iCloud selected')}>
+                              iCloud
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
-                      <div>
-                        <h3 className="font-medium text-gray-900">Gmail</h3>
-                        <p className="text-sm text-gray-800">Send introduction requests and follow-ups</p>
-                        <p className="text-xs text-gray-600 mt-1">
-                          {gmailStatus?.status === 'connected' && gmailStatus.email_address
-                            ? `Connected: ${gmailStatus.email_address}`
-                            : gmailStatus?.status === 'connected' && gmailStatus.last_connected
-                            ? `Last connected: ${new Date(gmailStatus.last_connected).toLocaleString()}`
-                            : 'Last connected: Never'
-                          }
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <Badge className={
-                        gmailStatus?.status === 'connected'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-600'
-                      }>
-                        {gmailStatus?.status === 'connected' ? (
-                          <>
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            Connected
-                          </>
-                        ) : (
-                          <>
-                            <X className="w-3 h-3 mr-1" />
-                            Not Connected
-                          </>
-                        )}
-                      </Badge>
-                      {gmailStatus?.error_message && (
-                        <p className="text-xs text-red-600 mt-1">{gmailStatus.error_message}</p>
-                      )}
-                    </div>
-                  </div>
+                      <Button
+                        onClick={async () => {
+                          // Simple connect action - just trigger the Calendar connection
+                          try {
+                            const response = await fetch('http://localhost:8000/api/v1/calendar/auth-url', {
+                              method: 'GET',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${localStorage.getItem('accessToken') || 'demo-token'}`
+                              }
+                            });
 
-                  {/* Google Calendar Integration */}
-                  <div className={`flex items-center justify-between p-4 rounded-lg border ${
-                    calendarStatus?.status === 'connected'
-                      ? 'bg-green-50 border-green-200'
-                      : 'bg-gray-50 border-gray-200'
-                  }`}>
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        calendarStatus?.status === 'connected'
-                          ? 'bg-blue-600'
-                          : 'bg-gray-400'
-                      }`}>
-                        <Calendar className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-gray-900">Google Calendar</h3>
-                        <p className="text-sm text-gray-800">Schedule meetings and manage events</p>
-                        <p className="text-xs text-gray-600 mt-1">
-                          {calendarStatus?.status === 'connected' && calendarStatus.email_address
-                            ? `Connected: ${calendarStatus.email_address}`
-                            : calendarStatus?.status === 'connected' && calendarStatus.last_connected
-                            ? `Last connected: ${new Date(calendarStatus.last_connected).toLocaleString()}`
-                            : 'Last connected: Never'
+                            if (!response.ok) {
+                              throw new Error('Failed to get Calendar authorization URL');
+                            }
+
+                            const data = await response.json();
+                            
+                            if (data.success && data.auth_url) {
+                              // Open authorization URL in new window
+                              const authWindow = window.open(
+                                data.auth_url,
+                                'calendar-auth',
+                                'width=500,height=600,scrollbars=yes,resizable=yes'
+                              );
+
+                              if (!authWindow) {
+                                alert('Failed to open authorization window. Please allow popups and try again.');
+                                return;
+                              }
+
+                              // Listen for messages from the callback page
+                              const handleMessage = (event: MessageEvent) => {
+                                if (event.origin !== window.location.origin) {
+                                  return;
+                                }
+
+                                if (event.data && event.data.type === 'CALENDAR_AUTH_SUCCESS') {
+                                  // Handle OAuth callback
+                                  handleCalendarOAuthCallback(event.data.code, authWindow, handleMessage);
+                                } else if (event.data && event.data.type === 'CALENDAR_AUTH_ERROR') {
+                                  authWindow.close();
+                                  alert(event.data.message || 'Calendar authorization failed');
+                                  window.removeEventListener('message', handleMessage);
+                                }
+                              };
+
+                              const handleCalendarOAuthCallback = async (code: string, authWindow: Window, handleMessage: (event: MessageEvent) => void) => {
+                                try {
+                                  const response = await fetch('http://localhost:8000/api/v1/calendar/connect', {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                      'Authorization': `Bearer ${localStorage.getItem('accessToken') || 'demo-token'}`
+                                    },
+                                    body: JSON.stringify({
+                                      authorization_code: code,
+                                      redirect_uri: 'http://localhost:5137/calendar/callback'
+                                    })
+                                  });
+
+                                  const data = await response.json();
+
+                                  if (data.success) {
+                                    authWindow.close();
+                                    fetchCalendarStatus();
+                                    window.removeEventListener('message', handleMessage);
+                                  } else {
+                                    throw new Error(data.message || 'Failed to connect Calendar');
+                                  }
+                                } catch (err) {
+                                  authWindow.close();
+                                  alert('Failed to connect Calendar: ' + (err instanceof Error ? err.message : 'Unknown error'));
+                                  window.removeEventListener('message', handleMessage);
+                                }
+                              };
+
+                              window.addEventListener('message', handleMessage);
+
+                              // Cleanup after 5 minutes
+                              setTimeout(() => {
+                                if (authWindow && !authWindow.closed) {
+                                  authWindow.close();
+                                }
+                                window.removeEventListener('message', handleMessage);
+                              }, 300000);
+                            }
+                          } catch (error) {
+                            alert('Failed to connect to Calendar: ' + (error instanceof Error ? error.message : 'Unknown error'));
                           }
-                        </p>
-                      </div>
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
+                        disabled={calendarStatus?.status === 'connected'}
+                      >
+                        {calendarStatus?.status === 'connected' ? 'Connected' : 'Connect'}
+                      </Button>
                     </div>
-                    <div className="text-right">
-                      <Badge className={
-                        calendarStatus?.status === 'connected'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-600'
-                      }>
-                        {calendarStatus?.status === 'connected' ? (
-                          <>
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            Connected
-                          </>
-                        ) : (
-                          <>
-                            <X className="w-3 h-3 mr-1" />
-                            Not Connected
-                          </>
-                        )}
-                      </Badge>
-                      {calendarStatus?.error_message && (
-                        <p className="text-xs text-red-600 mt-1">{calendarStatus.error_message}</p>
-                      )}
+                    <div className="h-0.5 bg-blue-600 mb-4"></div>
+                    
+                    {/* Calendar Connection Status */}
+                    <div className="mb-4">
+                      <p className="text-sm text-gray-600">
+                        {calendarStatus?.status === 'connected' && calendarStatus.email_address
+                          ? `Last connected: ${calendarStatus.email_address}`
+                          : calendarStatus?.status === 'connected' && calendarStatus.last_connected
+                          ? `Last connected: ${new Date(calendarStatus.last_connected).toLocaleString()}`
+                          : 'Last connected: Never'
+                        }
+                      </p>
                     </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
+
           </div>
         </div>
       </main>

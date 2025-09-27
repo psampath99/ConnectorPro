@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Mail, CheckCircle, AlertCircle, Loader2, Send, Search, RefreshCw, ExternalLink, Bot, Building2 } from 'lucide-react';
+import { Mail, CheckCircle, AlertCircle, Loader2, Send, Search, RefreshCw, ExternalLink, Bot, Building2, Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ToolOriginatedBadgeComponent } from '@/components/ui/tool-originated-badge';
 import { EnhancedGmailResponse, GmailEmail } from '@/types';
@@ -413,7 +413,7 @@ export const GmailIntegration = ({ onEmailsLoaded, onConnectionChange }: GmailIn
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center space-x-2">
             <Mail className="w-6 h-6 text-red-600" />
-            <span>Gmail Integration</span>
+            <span>Connect Your Gmail Account</span>
             {connectionState?.isConnected && (
               <Badge className="bg-green-100 text-green-800">
                 <CheckCircle className="w-3 h-3 mr-1" />
@@ -449,9 +449,6 @@ export const GmailIntegration = ({ onEmailsLoaded, onConnectionChange }: GmailIn
 
         {!connectionState?.isConnected ? (
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Connect your Gmail account to read emails, send messages, and manage your email communications.
-            </p>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h4 className="font-medium text-blue-900 mb-2">Required Permissions</h4>
               <ul className="text-sm text-blue-800 space-y-1">
