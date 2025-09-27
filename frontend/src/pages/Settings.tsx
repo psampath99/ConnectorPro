@@ -793,79 +793,124 @@ const Settings = () => {
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
-                      <Button
-                        onClick={selectedEmailProvider === 'Gmail' ? async () => {
-                          // Simple connect action - just trigger the Gmail connection
-                          try {
-                            const response = await fetch('http://localhost:8000/api/v1/gmail/auth-url', {
-                              method: 'GET',
-                              headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${localStorage.getItem('accessToken') || 'demo-token'}`
-                              }
-                            });
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          onClick={selectedEmailProvider === 'Gmail' ? async () => {
+                            // Simple connect action - just trigger the Gmail connection
+                            try {
+                              const response = await fetch('http://localhost:8000/api/v1/gmail/auth-url', {
+                                method: 'GET',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'Authorization': `Bearer ${localStorage.getItem('accessToken') || 'demo-token'}`
+                                }
+                              });
 
-                            if (!response.ok) {
-                              throw new Error('Failed to get Gmail authorization URL');
-                            }
-
-                            const data = await response.json();
-                            
-                            if (data.success && data.auth_url) {
-                              // Open authorization URL in new window
-                              const authWindow = window.open(
-                                data.auth_url,
-                                'gmail-auth',
-                                'width=500,height=600,scrollbars=yes,resizable=yes'
-                              );
-
-                              if (!authWindow) {
-                                alert('Failed to open authorization window. Please allow popups and try again.');
-                                return;
+                              if (!response.ok) {
+                                throw new Error('Failed to get Gmail authorization URL');
                               }
 
-                              // Listen for messages from the callback page
-                              const handleMessage = (event: MessageEvent) => {
-                                if (event.origin !== window.location.origin) {
+                              const data = await response.json();
+                              
+                              if (data.success && data.auth_url) {
+                                // Open authorization URL in new window
+                                const authWindow = window.open(
+                                  data.auth_url,
+                                  'gmail-auth',
+                                  'width=500,height=600,scrollbars=yes,resizable=yes'
+                                );
+
+                                if (!authWindow) {
+                                  alert('Failed to open authorization window. Please allow popups and try again.');
                                   return;
                                 }
 
-                                if (event.data && event.data.type === 'GMAIL_AUTH_SUCCESS') {
-                                  authWindow.close();
-                                  fetchGmailStatus();
-                                  window.removeEventListener('message', handleMessage);
-                                } else if (event.data && event.data.type === 'GMAIL_AUTH_ERROR') {
-                                  authWindow.close();
-                                  alert(event.data.message || 'Gmail authorization failed');
-                                  window.removeEventListener('message', handleMessage);
-                                }
-                              };
+                                // Listen for messages from the callback page
+                                const handleMessage = (event: MessageEvent) => {
+                                  if (event.origin !== window.location.origin) {
+                                    return;
+                                  }
 
-                              window.addEventListener('message', handleMessage);
+                                  if (event.data && event.data.type === 'GMAIL_AUTH_SUCCESS') {
+                                    authWindow.close();
+                                    fetchGmailStatus();
+                                    window.removeEventListener('message', handleMessage);
+                                  } else if (event.data && event.data.type === 'GMAIL_AUTH_ERROR') {
+                                    authWindow.close();
+                                    alert(event.data.message || 'Gmail authorization failed');
+                                    window.removeEventListener('message', handleMessage);
+                                  }
+                                };
 
-                              // Cleanup after 5 minutes
-                              setTimeout(() => {
-                                if (authWindow && !authWindow.closed) {
-                                  authWindow.close();
-                                }
-                                window.removeEventListener('message', handleMessage);
-                              }, 300000);
+                                window.addEventListener('message', handleMessage);
+
+                                // Cleanup after 5 minutes
+                                setTimeout(() => {
+                                  if (authWindow && !authWindow.closed) {
+                                    authWindow.close();
+                                  }
+                                  window.removeEventListener('message', handleMessage);
+                                }, 300000);
+                              }
+                            } catch (error) {
+                              alert('Failed to connect to Gmail: ' + (error instanceof Error ? error.message : 'Unknown error'));
                             }
-                          } catch (error) {
-                            alert('Failed to connect to Gmail: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                          } : undefined}
+                          className={selectedEmailProvider === 'Gmail'
+                            ? (gmailStatus?.status === 'connected'
+                                ? "bg-green-600 hover:bg-green-700 text-white px-6 py-2"
+                                : "bg-blue-600 hover:bg-blue-700 text-white px-6 py-2")
+                            : "bg-gray-400 text-gray-600 px-6 py-2 cursor-not-allowed"
                           }
-                        } : undefined}
-                        className={selectedEmailProvider === 'Gmail'
-                          ? "bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
-                          : "bg-gray-400 text-gray-600 px-6 py-2 cursor-not-allowed"
-                        }
-                        disabled={selectedEmailProvider !== 'Gmail' || gmailStatus?.status === 'connected'}
-                      >
-                        {selectedEmailProvider === 'Gmail'
-                          ? (gmailStatus?.status === 'connected' ? 'Connected' : 'Connect')
-                          : 'Not Supported'
-                        }
-                      </Button>
+                          disabled={selectedEmailProvider !== 'Gmail' || gmailStatus?.status === 'connected'}
+                        >
+                          {selectedEmailProvider === 'Gmail'
+                            ? (gmailStatus?.status === 'connected' ? (
+                                <div className="flex items-center space-x-2">
+                                  <CheckCircle className="w-4 h-4" />
+                                  <span>Connected</span>
+                                </div>
+                              ) : 'Connect')
+                            : 'Not Supported'
+                          }
+                        </Button>
+                        
+                        {/* Disconnect Button for Gmail */}
+                        {gmailStatus?.status === 'connected' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                const response = await fetch('http://localhost:8000/api/v1/gmail/disconnect', {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${localStorage.getItem('accessToken') || 'demo-token'}`
+                                  }
+                                });
+
+                                if (response.ok) {
+                                  const data = await response.json();
+                                  if (data.success) {
+                                    // Refresh Gmail status
+                                    fetchGmailStatus();
+                                  } else {
+                                    alert('Failed to disconnect Gmail: ' + (data.message || 'Unknown error'));
+                                  }
+                                } else {
+                                  throw new Error('Failed to disconnect Gmail');
+                                }
+                              } catch (error) {
+                                alert('Failed to disconnect Gmail: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                              }
+                            }}
+                            className="text-red-600 border-red-300 hover:bg-red-50 hover:border-red-400"
+                          >
+                            Disconnect
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <div className="h-0.5 bg-blue-600 mb-4"></div>
                     
@@ -874,11 +919,22 @@ const Settings = () => {
                       <p className="text-sm text-gray-600">
                         {gmailStatus?.status === 'connected' && gmailStatus.email_address
                           ? `Last connected: ${gmailStatus.email_address}`
-                          : gmailStatus?.status === 'connected' && gmailStatus.last_connected
-                          ? `Last connected: ${new Date(gmailStatus.last_connected).toLocaleString()}`
                           : 'Last connected: Never'
                         }
                       </p>
+                      {gmailStatus?.status === 'connected' && gmailStatus.last_connected && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {new Date(gmailStatus.last_connected).toLocaleString('en-US', {
+                            weekday: 'short',
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            timeZoneName: 'short'
+                          })}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -907,108 +963,153 @@ const Settings = () => {
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
-                      <Button
-                        onClick={selectedCalendarProvider === 'Google' ? async () => {
-                          // Simple connect action - just trigger the Calendar connection
-                          try {
-                            const response = await fetch('http://localhost:8000/api/v1/calendar/auth-url', {
-                              method: 'GET',
-                              headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${localStorage.getItem('accessToken') || 'demo-token'}`
-                              }
-                            });
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          onClick={selectedCalendarProvider === 'Google' ? async () => {
+                            // Simple connect action - just trigger the Calendar connection
+                            try {
+                              const response = await fetch('http://localhost:8000/api/v1/calendar/auth-url', {
+                                method: 'GET',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'Authorization': `Bearer ${localStorage.getItem('accessToken') || 'demo-token'}`
+                                }
+                              });
 
-                            if (!response.ok) {
-                              throw new Error('Failed to get Calendar authorization URL');
-                            }
-
-                            const data = await response.json();
-                            
-                            if (data.success && data.auth_url) {
-                              // Open authorization URL in new window
-                              const authWindow = window.open(
-                                data.auth_url,
-                                'calendar-auth',
-                                'width=500,height=600,scrollbars=yes,resizable=yes'
-                              );
-
-                              if (!authWindow) {
-                                alert('Failed to open authorization window. Please allow popups and try again.');
-                                return;
+                              if (!response.ok) {
+                                throw new Error('Failed to get Calendar authorization URL');
                               }
 
-                              // Listen for messages from the callback page
-                              const handleMessage = (event: MessageEvent) => {
-                                if (event.origin !== window.location.origin) {
+                              const data = await response.json();
+                              
+                              if (data.success && data.auth_url) {
+                                // Open authorization URL in new window
+                                const authWindow = window.open(
+                                  data.auth_url,
+                                  'calendar-auth',
+                                  'width=500,height=600,scrollbars=yes,resizable=yes'
+                                );
+
+                                if (!authWindow) {
+                                  alert('Failed to open authorization window. Please allow popups and try again.');
                                   return;
                                 }
 
-                                if (event.data && event.data.type === 'CALENDAR_AUTH_SUCCESS') {
-                                  // Handle OAuth callback
-                                  handleCalendarOAuthCallback(event.data.code, authWindow, handleMessage);
-                                } else if (event.data && event.data.type === 'CALENDAR_AUTH_ERROR') {
-                                  authWindow.close();
-                                  alert(event.data.message || 'Calendar authorization failed');
-                                  window.removeEventListener('message', handleMessage);
-                                }
-                              };
-
-                              const handleCalendarOAuthCallback = async (code: string, authWindow: Window, handleMessage: (event: MessageEvent) => void) => {
-                                try {
-                                  const response = await fetch('http://localhost:8000/api/v1/calendar/connect', {
-                                    method: 'POST',
-                                    headers: {
-                                      'Content-Type': 'application/json',
-                                      'Authorization': `Bearer ${localStorage.getItem('accessToken') || 'demo-token'}`
-                                    },
-                                    body: JSON.stringify({
-                                      authorization_code: code,
-                                      redirect_uri: 'http://localhost:5137/calendar/callback'
-                                    })
-                                  });
-
-                                  const data = await response.json();
-
-                                  if (data.success) {
-                                    authWindow.close();
-                                    fetchCalendarStatus();
-                                    window.removeEventListener('message', handleMessage);
-                                  } else {
-                                    throw new Error(data.message || 'Failed to connect Calendar');
+                                // Listen for messages from the callback page
+                                const handleMessage = (event: MessageEvent) => {
+                                  if (event.origin !== window.location.origin) {
+                                    return;
                                   }
-                                } catch (err) {
-                                  authWindow.close();
-                                  alert('Failed to connect Calendar: ' + (err instanceof Error ? err.message : 'Unknown error'));
+
+                                  if (event.data && event.data.type === 'CALENDAR_AUTH_SUCCESS') {
+                                    // Handle OAuth callback
+                                    handleCalendarOAuthCallback(event.data.code, authWindow, handleMessage);
+                                  } else if (event.data && event.data.type === 'CALENDAR_AUTH_ERROR') {
+                                    authWindow.close();
+                                    alert(event.data.message || 'Calendar authorization failed');
+                                    window.removeEventListener('message', handleMessage);
+                                  }
+                                };
+
+                                const handleCalendarOAuthCallback = async (code: string, authWindow: Window, handleMessage: (event: MessageEvent) => void) => {
+                                  try {
+                                    const response = await fetch('http://localhost:8000/api/v1/calendar/connect', {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer ${localStorage.getItem('accessToken') || 'demo-token'}`
+                                      },
+                                      body: JSON.stringify({
+                                        authorization_code: code,
+                                        redirect_uri: 'http://localhost:5137/calendar/callback'
+                                      })
+                                    });
+
+                                    const data = await response.json();
+
+                                    if (data.success) {
+                                      authWindow.close();
+                                      fetchCalendarStatus();
+                                      window.removeEventListener('message', handleMessage);
+                                    } else {
+                                      throw new Error(data.message || 'Failed to connect Calendar');
+                                    }
+                                  } catch (err) {
+                                    authWindow.close();
+                                    alert('Failed to connect Calendar: ' + (err instanceof Error ? err.message : 'Unknown error'));
+                                    window.removeEventListener('message', handleMessage);
+                                  }
+                                };
+
+                                window.addEventListener('message', handleMessage);
+
+                                // Cleanup after 5 minutes
+                                setTimeout(() => {
+                                  if (authWindow && !authWindow.closed) {
+                                    authWindow.close();
+                                  }
                                   window.removeEventListener('message', handleMessage);
-                                }
-                              };
-
-                              window.addEventListener('message', handleMessage);
-
-                              // Cleanup after 5 minutes
-                              setTimeout(() => {
-                                if (authWindow && !authWindow.closed) {
-                                  authWindow.close();
-                                }
-                                window.removeEventListener('message', handleMessage);
-                              }, 300000);
+                                }, 300000);
+                              }
+                            } catch (error) {
+                              alert('Failed to connect to Calendar: ' + (error instanceof Error ? error.message : 'Unknown error'));
                             }
-                          } catch (error) {
-                            alert('Failed to connect to Calendar: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                          } : undefined}
+                          className={selectedCalendarProvider === 'Google'
+                            ? (calendarStatus?.status === 'connected'
+                                ? "bg-green-600 hover:bg-green-700 text-white px-6 py-2"
+                                : "bg-blue-600 hover:bg-blue-700 text-white px-6 py-2")
+                            : "bg-gray-400 text-gray-600 px-6 py-2 cursor-not-allowed"
                           }
-                        } : undefined}
-                        className={selectedCalendarProvider === 'Google'
-                          ? "bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
-                          : "bg-gray-400 text-gray-600 px-6 py-2 cursor-not-allowed"
-                        }
-                        disabled={selectedCalendarProvider !== 'Google' || calendarStatus?.status === 'connected'}
-                      >
-                        {selectedCalendarProvider === 'Google'
-                          ? (calendarStatus?.status === 'connected' ? 'Connected' : 'Connect')
-                          : 'Not Supported'
-                        }
-                      </Button>
+                          disabled={selectedCalendarProvider !== 'Google' || calendarStatus?.status === 'connected'}
+                        >
+                          {selectedCalendarProvider === 'Google'
+                            ? (calendarStatus?.status === 'connected' ? (
+                                <div className="flex items-center space-x-2">
+                                  <CheckCircle className="w-4 h-4" />
+                                  <span>Connected</span>
+                                </div>
+                              ) : 'Connect')
+                            : 'Not Supported'
+                          }
+                        </Button>
+                        
+                        {/* Disconnect Button for Calendar */}
+                        {calendarStatus?.status === 'connected' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                const response = await fetch('http://localhost:8000/api/v1/calendar/disconnect', {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${localStorage.getItem('accessToken') || 'demo-token'}`
+                                  }
+                                });
+
+                                if (response.ok) {
+                                  const data = await response.json();
+                                  if (data.success) {
+                                    // Refresh Calendar status
+                                    fetchCalendarStatus();
+                                  } else {
+                                    alert('Failed to disconnect Calendar: ' + (data.message || 'Unknown error'));
+                                  }
+                                } else {
+                                  throw new Error('Failed to disconnect Calendar');
+                                }
+                              } catch (error) {
+                                alert('Failed to disconnect Calendar: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                              }
+                            }}
+                            className="text-red-600 border-red-300 hover:bg-red-50 hover:border-red-400"
+                          >
+                            Disconnect
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <div className="h-0.5 bg-blue-600 mb-4"></div>
                     
@@ -1017,11 +1118,22 @@ const Settings = () => {
                       <p className="text-sm text-gray-600">
                         {calendarStatus?.status === 'connected' && calendarStatus.email_address
                           ? `Last connected: ${calendarStatus.email_address}`
-                          : calendarStatus?.status === 'connected' && calendarStatus.last_connected
-                          ? `Last connected: ${new Date(calendarStatus.last_connected).toLocaleString()}`
                           : 'Last connected: Never'
                         }
                       </p>
+                      {calendarStatus?.status === 'connected' && calendarStatus.last_connected && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {new Date(calendarStatus.last_connected).toLocaleString('en-US', {
+                            weekday: 'short',
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            timeZoneName: 'short'
+                          })}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
