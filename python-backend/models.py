@@ -235,3 +235,17 @@ class NetworkQueryResponse(BaseModel):
     provider_used: Optional[str] = None
     processing_time: Optional[float] = None
     error_message: Optional[str] = None
+
+# Ask Endpoint Models
+class AskRequest(BaseModel):
+    query: str
+    include_contact_details: Optional[bool] = True
+    max_contacts: Optional[int] = 50
+
+class AskResponse(BaseModel):
+    success: bool
+    query: str
+    answer: str
+    contacts_used: Optional[int] = None
+    processing_time: Optional[float] = None
+    error_message: Optional[str] = None

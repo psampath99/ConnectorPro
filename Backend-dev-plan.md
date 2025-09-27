@@ -95,7 +95,7 @@
 - `MONGODB_URI`: (To be provided by the user)
 - `JWT_SECRET`: A long, random, and secret string.
 - `JWT_EXPIRES_IN`: `3600` (1 hour)
-- `CORS_ORIGINS`: The frontend application's URL (e.g., `http://localhost:5173`).
+- `CORS_ORIGINS`: The frontend application's URL (e.g., `http://localhost:5137`).
 
 # 9) Testing Strategy (Manual via Frontend)
 - **Policy:** All backend features will be validated by interacting with the frontend UI. The browser's Network tab in DevTools will be used to inspect API requests and responses.
