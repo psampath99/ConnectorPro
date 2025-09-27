@@ -385,7 +385,7 @@ const Settings = () => {
                   <div className="bg-gray-100 rounded-lg p-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-800 mb-1">
+                        <label className="block text-lg font-medium text-gray-900 mb-1">
                           First Name
                         </label>
                         <Input
@@ -395,7 +395,7 @@ const Settings = () => {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-800 mb-1">
+                        <label className="block text-lg font-medium text-gray-900 mb-1">
                           Last Name
                         </label>
                         <Input
@@ -405,13 +405,13 @@ const Settings = () => {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-800 mb-1">
+                        <label className="block text-lg font-medium text-gray-900 mb-1">
                           Email Address
                         </label>
                         <Input value={user.email} disabled className="bg-white text-sm" />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-800 mb-1">
+                        <label className="block text-lg font-medium text-gray-900 mb-1">
                           LinkedIn Profile
                         </label>
                         <Input
@@ -421,13 +421,13 @@ const Settings = () => {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-800 mb-1">
+                        <label className="block text-lg font-medium text-gray-900 mb-1">
                           Role
                         </label>
                         <Input value={roleLabels[user.role]} disabled className="bg-white text-sm" />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-800 mb-1">
+                        <label className="block text-lg font-medium text-gray-900 mb-1">
                           Message Tone
                         </label>
                         <Input value={user.preferences.draftTone} disabled className="bg-white text-sm" />
@@ -500,7 +500,7 @@ const Settings = () => {
 
                 {/* Add from Popular Companies */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-800 mb-3">
+                  <label className="block text-lg font-medium text-gray-900 mb-3">
                     Add Popular Companies
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -522,7 +522,7 @@ const Settings = () => {
 
                 {/* Add Custom Company */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-800 mb-2">
+                  <label className="block text-lg font-medium text-gray-900 mb-2">
                     Add Custom Company
                   </label>
                   <div className="flex space-x-2">
@@ -549,73 +549,106 @@ const Settings = () => {
             {user && (
               <Card>
                 <CardHeader className="relative">
-                  <CardTitle className="flex items-center space-x-2" style={{ marginBottom: '1px' }}>
-                    <SettingsIcon className="w-5 h-5" />
-                    <span>Networking Preferences</span>
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2" style={{ marginBottom: '1px' }}>
+                      <SettingsIcon className="w-5 h-5" />
+                      <span>Networking Preferences</span>
+                    </div>
+                    <div className="group relative">
+                      <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center cursor-help hover:bg-blue-700 transition-colors duration-200">
+                        <Info className="w-3 h-3 text-white" />
+                      </div>
+                      <div className="absolute right-0 top-6 w-80 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 pointer-events-none">
+                        <h4 className="font-medium text-white mb-1">Networking Preferences</h4>
+                        <p>Update your preferences for outreach and how you want to prioritize recommendations on whom to connect</p>
+                        <div className="absolute -top-1 right-3 w-2 h-2 bg-gray-900 rotate-45"></div>
+                      </div>
+                    </div>
                   </CardTitle>
                   <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600"></div>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <Tabs defaultValue="general" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="general">General</TabsTrigger>
-                      <TabsTrigger value="message-tone">Message Tone</TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="general" className="space-y-6">
-                      {/* Reminder Frequency */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-800 mb-2">
-                          Follow-up Reminder Frequency
-                        </label>
-                        <Select
-                          value={user.preferences.reminderFrequency.toString()}
-                          onValueChange={(value) => updateUserPreferences({ reminderFrequency: parseInt(value) })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="3">Every 3 days</SelectItem>
-                            <SelectItem value="7">Every week</SelectItem>
-                            <SelectItem value="14">Every 2 weeks</SelectItem>
-                            <SelectItem value="30">Every month</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </TabsContent>
+                  {/* Three Dropdowns in a Row */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Persona Dropdown */}
+                    <div className="space-y-2">
+                      <label className="text-lg font-medium text-gray-900">
+                        Persona
+                      </label>
+                      <Select value={user.role} onValueChange={(value: any) => {
+                        const updatedUser = { ...user, role: value };
+                        setUser(updatedUser);
+                        storage.setUser(updatedUser);
+                      }}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select persona" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="job_seeker">Job Seeker</SelectItem>
+                          <SelectItem value="consultant">Consultant</SelectItem>
+                          <SelectItem value="community_manager">Community Manager</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                    <TabsContent value="message-tone" className="space-y-6">
-                      {/* Message Tone */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-800 mb-2">
-                          Default Message Tone
-                        </label>
-                        <Select
-                          value={user.preferences.draftTone}
-                          onValueChange={(value: any) => updateUserPreferences({ draftTone: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="professional">Professional - Formal and business-focused</SelectItem>
-                            <SelectItem value="friendly">Friendly - Warm and approachable</SelectItem>
-                            <SelectItem value="concise">Concise - Brief and to the point</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </TabsContent>
-                  </Tabs>
+                    {/* Message Tone Dropdown */}
+                    <div className="space-y-2">
+                      <label className="text-lg font-medium text-gray-900">
+                        Message Tone
+                      </label>
+                      <Select
+                        value={user.preferences.draftTone}
+                        onValueChange={(value: any) => updateUserPreferences({ draftTone: value })}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select message tone" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="professional">Professional</SelectItem>
+                          <SelectItem value="friendly">Friendly</SelectItem>
+                          <SelectItem value="casual">Casual</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Follow-up Frequency Dropdown */}
+                    <div className="space-y-2">
+                      <label className="text-lg font-medium text-gray-900">
+                        Follow-up Reminder Frequency
+                      </label>
+                      <Select
+                        value={user.preferences.reminderFrequency.toString()}
+                        onValueChange={(value) => updateUserPreferences({ reminderFrequency: parseInt(value) })}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select follow-up frequency" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="3">Every 3 days</SelectItem>
+                          <SelectItem value="7">Every week</SelectItem>
+                          <SelectItem value="14">Every 2 weeks</SelectItem>
+                          <SelectItem value="30">Every month</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
 
                   {/* Commonality Priority Order */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-800 mb-2">
-                      Commonality Priority Order
-                    </label>
-                    <p className="text-sm text-gray-600 mb-3">
-                      This determines how AI prioritizes shared connections when suggesting introductions. Drag to reorder.
-                    </p>
+                    <div className="flex items-center space-x-2 mb-2">
+                      <label className="block text-lg font-medium text-gray-900">
+                        Commonality Priority Order
+                      </label>
+                      <div className="group relative">
+                        <div className="w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center cursor-help hover:bg-blue-700 transition-colors duration-200">
+                          <Info className="w-2.5 h-2.5 text-white" />
+                        </div>
+                        <div className="absolute left-0 top-6 w-32 bg-gray-900 text-white text-xs rounded-lg p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 pointer-events-none">
+                          <p>Drag to reorder</p>
+                          <div className="absolute -top-1 left-3 w-2 h-2 bg-gray-900 rotate-45"></div>
+                        </div>
+                      </div>
+                    </div>
                     <div className="space-y-2">
                       {user.preferences.commonalityOrder.map((commonality, index) => (
                         <div
