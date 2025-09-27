@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow';
+import { SingleScreenOnboarding } from '@/components/onboarding/SingleScreenOnboarding';
 import { storage } from '@/lib/storage';
 import { User } from '@/types';
 import { 
@@ -51,7 +51,40 @@ const Index = () => {
     setIsLoading(false);
   }, []);
 
-  const handleOnboardingComplete = (user: User) => {
+  const handleOnboardingComplete = (onboardingData: any) => {
+    // Convert SingleScreenOnboardingData to User format
+    const user: User = {
+      id: `user-${Date.now()}`,
+      email: onboardingData.email,
+      name: `${onboardingData.firstName} ${onboardingData.lastName}`.trim(),
+      role: onboardingData.persona as User['role'],
+      createdAt: new Date(),
+      preferences: {
+        commonalityOrder: ['employer', 'education', 'mutual', 'event'],
+        draftTone: 'professional',
+        reminderFrequency: 7
+      }
+    };
+
+    // Store the onboarding data including target companies
+    storage.setUser(user);
+    storage.setOnboardingData({
+      ...onboardingData,
+      name: user.name,
+      linkedinConnected: false,
+      emailConnected: false,
+      calendarConnected: false,
+      csvUploaded: false,
+      csvImportResult: null,
+      uploadedFiles: [],
+      draftTone: 'professional',
+      commonalityOrder: ['employer', 'education', 'mutual', 'event']
+    }, 'other');
+
+    // Store target companies
+    localStorage.setItem('connectorpro_target_companies', JSON.stringify(onboardingData.targetCompanies));
+    localStorage.setItem('connectorpro_onboarding_complete', 'true');
+
     // Initialize mock data with the new user
     storage.initializeMockData({
       user,
@@ -80,7 +113,7 @@ const Index = () => {
   }
 
   if (showOnboarding) {
-    return <OnboardingFlow onComplete={handleOnboardingComplete} />;
+    return <SingleScreenOnboarding onComplete={handleOnboardingComplete} />;
   }
 
   return (
