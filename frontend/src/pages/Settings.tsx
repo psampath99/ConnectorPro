@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -51,6 +52,7 @@ const roleLabels = {
 };
 
 const Settings = () => {
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [targetCompanies, setTargetCompanies] = useState<string[]>([]);
   const [customCompany, setCustomCompany] = useState('');
@@ -936,6 +938,27 @@ const Settings = () => {
                         </p>
                       )}
                     </div>
+
+                    {/* Message and Inbox Buttons - Only show when Gmail is connected */}
+                    {gmailStatus?.status === 'connected' && (
+                      <div className="mt-4 flex space-x-3">
+                        <Button
+                          onClick={() => navigate('/messages')}
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm"
+                        >
+                          <Mail className="w-4 h-4 mr-2" />
+                          Message
+                        </Button>
+                        <Button
+                          onClick={() => navigate('/messages?view=inbox')}
+                          variant="outline"
+                          className="border-blue-600 text-blue-600 hover:bg-blue-50 px-4 py-2 text-sm"
+                        >
+                          <Mail className="w-4 h-4 mr-2" />
+                          Inbox
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Right Panel - Calendar */}
