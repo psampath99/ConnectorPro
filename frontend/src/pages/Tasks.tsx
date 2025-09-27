@@ -8,7 +8,6 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { TargetCompaniesModal } from '@/components/modals/TargetCompaniesModal';
-import { FloatingAIButton } from '@/components/ui/floating-ai-button';
 import { storage } from '@/lib/storage';
 import { Task, Contact } from '@/types';
 import { 
@@ -700,7 +699,6 @@ const Tasks = () => {
         </div>
       </main>
       
-      <FloatingAIButton />
     </div>
   );
 };

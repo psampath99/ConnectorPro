@@ -1,9 +1,8 @@
-import { User, Contact, Conversation, Draft, Task, Meeting, Recommendation, Activity } from '@/types';
+import { User, Contact, Draft, Task, Meeting, Recommendation, Activity } from '@/types';
 
 const STORAGE_KEYS = {
   USER: 'connectorpro_user',
   CONTACTS: 'connectorpro_contacts',
-  CONVERSATIONS: 'connectorpro_conversations',
   DRAFTS: 'connectorpro_drafts',
   TASKS: 'connectorpro_tasks',
   MEETINGS: 'connectorpro_meetings',
@@ -68,21 +67,6 @@ export const storage = {
     storage.setContacts(filtered);
   },
 
-  // Conversations
-  getConversations: (): Conversation[] => {
-    const data = localStorage.getItem(STORAGE_KEYS.CONVERSATIONS);
-    return data ? JSON.parse(data) : [];
-  },
-  
-  setConversations: (conversations: Conversation[]): void => {
-    localStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(conversations));
-  },
-
-  addConversation: (conversation: Conversation): void => {
-    const conversations = storage.getConversations();
-    conversations.push(conversation);
-    storage.setConversations(conversations);
-  },
 
   // Drafts
   getDrafts: (): Draft[] => {

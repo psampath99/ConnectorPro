@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChatInterface } from '@/components/assistant/ChatInterface';
 import { NetworkQueryInterface } from '@/components/network/NetworkQueryInterface';
-import { Conversation } from '@/types';
 import {
   Network as NetworkIcon,
   Users,
@@ -17,7 +15,6 @@ import {
 const Network = () => {
   const [targetCompanies, setTargetCompanies] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [conversation, setConversation] = useState<Conversation | undefined>();
   
   // Analytics state
   const [analytics, setAnalytics] = useState({
@@ -165,9 +162,6 @@ const Network = () => {
     }
   }, [targetCompanies.length]);
 
-  const handleNewConversation = (newConversation: Conversation) => {
-    setConversation(newConversation);
-  };
 
   const refreshAnalytics = () => {
     fetchAnalytics();
@@ -277,13 +271,6 @@ const Network = () => {
           </div>
         </div>
 
-        {/* Chat Interface */}
-        <div className="flex-1 bg-white">
-          <ChatInterface
-            conversation={conversation}
-            onNewConversation={handleNewConversation}
-          />
-        </div>
       </main>
     </div>
   );

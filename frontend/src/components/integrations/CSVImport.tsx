@@ -294,12 +294,6 @@ export const CSVImport = ({ onContactsImported }: CSVImportProps) => {
 
   return (
     <div className="w-full max-w-2xl space-y-6">
-      {/* Header */}
-      <div className="flex items-center space-x-3">
-        <FileText className="w-6 h-6 text-green-600" />
-        <h2 className="text-xl font-semibold">CSV Import</h2>
-      </div>
-
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -307,30 +301,9 @@ export const CSVImport = ({ onContactsImported }: CSVImportProps) => {
         </Alert>
       )}
 
-      {/* Instructions - Compact */}
-      <div className="bg-blue-50 rounded-lg p-4">
-        <h4 className="font-medium text-blue-900 mb-3">How to get your LinkedIn CSV</h4>
-        <div className="text-sm text-blue-800 space-y-1">
-          <p>1. Go to LinkedIn → Settings & Privacy → Data Privacy</p>
-          <p>2. Click "Get a copy of your data"</p>
-          <p>3. Select "Connections" and request your data</p>
-          <p>4. Download the CSV file when ready (usually within 24 hours)</p>
-          <p>5. Upload the CSV file below</p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={downloadSampleCSV}
-          className="mt-3"
-        >
-          <Download className="w-4 h-4 mr-2" />
-          Download Sample CSV Format
-        </Button>
-      </div>
-
-      {/* File Upload - Streamlined */}
-      <div className="space-y-4">
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+      {/* File Upload - Compact */}
+      <div className="space-y-3">
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors">
           <input
             ref={fileInputRef}
             type="file"
@@ -340,15 +313,15 @@ export const CSVImport = ({ onContactsImported }: CSVImportProps) => {
             id="csv-upload"
           />
           <label htmlFor="csv-upload" className="cursor-pointer">
-            <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-            <p className="font-medium text-gray-700 mb-1">
+            <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+            <p className="font-medium text-gray-700 mb-1 text-sm">
               {selectedFile ? selectedFile.name : 'Choose CSV file'}
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-xs text-gray-500">
               Click to browse or drag and drop your LinkedIn CSV file
             </p>
             {selectedFile && (
-              <p className="text-xs text-gray-400 mt-2">
+              <p className="text-xs text-gray-400 mt-1">
                 {(selectedFile.size / 1024).toFixed(1)} KB
               </p>
             )}
@@ -380,7 +353,7 @@ export const CSVImport = ({ onContactsImported }: CSVImportProps) => {
           onClick={handleUpload}
           disabled={!selectedFile || isUploading}
           className="w-full"
-          size="lg"
+          size="default"
         >
           {isUploading ? (
             <>

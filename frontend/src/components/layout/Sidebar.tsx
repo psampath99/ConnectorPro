@@ -13,7 +13,6 @@ import {
   Calendar, 
   CheckSquare, 
   Settings,
-  Bot,
   Network,
   Mail,
   Activity
@@ -26,7 +25,6 @@ const navigation = [
   { name: 'Meetings', href: '/meetings', icon: Calendar },
   { name: 'Messages', href: '/messages', icon: MessageSquare },
   { name: 'Tasks', href: '/tasks', icon: CheckSquare },
-  { name: 'AI Assistant', href: '/assistant', icon: Bot },
   { name: 'Network', href: '/network', icon: Network },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];

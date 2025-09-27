@@ -8,7 +8,6 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { TargetCompaniesModal } from '@/components/modals/TargetCompaniesModal';
-import { FloatingAIButton } from '@/components/ui/floating-ai-button';
 import { ToolOriginatedBadgeComponent } from '@/components/ui/tool-originated-badge';
 import { storage } from '@/lib/storage';
 import { Draft, Contact, EnhancedGmailResponse, GmailEmail } from '@/types';
@@ -1032,7 +1031,6 @@ const Messages = () => {
         </div>
       </main>
       
-      <FloatingAIButton />
     </div>
   );
 };

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow';
-import { FloatingAIButton } from '@/components/ui/floating-ai-button';
 import { storage } from '@/lib/storage';
 import { User } from '@/types';
 import { 
@@ -93,7 +92,6 @@ const Index = () => {
         </div>
       </main>
       
-      <FloatingAIButton />
     </div>
   );
 };

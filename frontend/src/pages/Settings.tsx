@@ -27,7 +27,11 @@ import {
   Info,
   Edit3,
   Mail,
-  Calendar
+  Calendar,
+  GripVertical,
+  ChevronUp,
+  ChevronDown,
+  FileText
 } from 'lucide-react';
 
 const commonCompanies = [
@@ -50,6 +54,7 @@ const Settings = () => {
   const [hasChanges, setHasChanges] = useState(false);
   const [originalTargetCompanies, setOriginalTargetCompanies] = useState<string[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [contactStats, setContactStats] = useState({
     totalActiveContacts: 0,
     latestUpload: null
@@ -282,6 +287,39 @@ const Settings = () => {
     storage.setUser(updatedUser);
   };
 
+  // Function to handle commonality order changes
+  const moveCommonalityItem = (fromIndex: number, toIndex: number) => {
+    if (!user) return;
+    
+    const newOrder = [...user.preferences.commonalityOrder];
+    const [movedItem] = newOrder.splice(fromIndex, 1);
+    newOrder.splice(toIndex, 0, movedItem);
+    
+    updateUserPreferences({ commonalityOrder: newOrder });
+  };
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedItem(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedItem !== null && draggedItem !== dropIndex) {
+      moveCommonalityItem(draggedItem, dropIndex);
+    }
+    setDraggedItem(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
+  };
+
   // Function to trigger refresh of upload history and integration status
   const handleUploadComplete = () => {
     setRefreshTrigger(prev => prev + 1);
@@ -289,7 +327,7 @@ const Settings = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-200">
       <Sidebar />
       <main className="flex-1 overflow-auto">
         <div className="p-6">
@@ -297,43 +335,93 @@ const Settings = () => {
             {/* Header */}
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-              <p className="text-gray-600">Manage your account preferences and networking settings</p>
+              <p className="text-gray-700">Manage your account preferences and networking settings</p>
             </div>
 
-            {/* User Profile */}
+            {/* Profile and Account Information */}
             {user && (
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <UserIcon className="w-5 h-5" />
-                    <span>Profile Information</span>
-                  </CardTitle>
+                <CardHeader className="relative">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center space-x-2" style={{ marginBottom: '1px' }}>
+                      <UserIcon className="w-5 h-5" />
+                      <span>Profile and Account Information</span>
+                    </CardTitle>
+                    <div className="group relative">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          // Clear onboarding completion flag to trigger onboarding flow
+                          localStorage.removeItem('connectorpro_onboarding_complete');
+                          
+                          // Redirect to home page which will show onboarding
+                          window.location.href = '/';
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 flex items-center space-x-1"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                        <Info className="w-3 h-3" />
+                      </Button>
+                      <div className="absolute right-0 top-10 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 pointer-events-none">
+                        This will take you through the setup process again while preserving your existing data
+                        <div className="absolute -top-1 right-3 w-2 h-2 bg-gray-900 rotate-45"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600"></div>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Full Name
-                      </label>
-                      <Input value={user.name} disabled className="bg-gray-50" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Email Address
-                      </label>
-                      <Input value={user.email} disabled className="bg-gray-50" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Role
-                      </label>
-                      <Input value={roleLabels[user.role]} disabled className="bg-gray-50" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Member Since
-                      </label>
-                      <Input value={new Date(user.createdAt).toLocaleDateString()} disabled className="bg-gray-50" />
+                  {/* Profile Information Box */}
+                  <div className="bg-gray-100 rounded-lg p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-800 mb-1">
+                          First Name
+                        </label>
+                        <Input
+                          value={user.name.split(' ')[0] || ''}
+                          disabled
+                          className="bg-white text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-800 mb-1">
+                          Last Name
+                        </label>
+                        <Input
+                          value={user.name.split(' ').slice(1).join(' ') || ''}
+                          disabled
+                          className="bg-white text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-800 mb-1">
+                          Email Address
+                        </label>
+                        <Input value={user.email} disabled className="bg-white text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-800 mb-1">
+                          LinkedIn Profile
+                        </label>
+                        <Input
+                          value={storage.getOnboardingData().linkedinProfileUrl || 'Not provided'}
+                          disabled
+                          className="bg-white text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-800 mb-1">
+                          Role
+                        </label>
+                        <Input value={roleLabels[user.role]} disabled className="bg-white text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-800 mb-1">
+                          Message Tone
+                        </label>
+                        <Input value={user.preferences.draftTone} disabled className="bg-white text-sm" />
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -342,47 +430,43 @@ const Settings = () => {
 
             {/* Target Companies Management */}
             <Card>
-              <CardHeader>
+              <CardHeader className="relative">
                 <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2" style={{ marginBottom: '1px' }}>
                     <Target className="w-5 h-5" />
                     <span>Target Companies</span>
                   </div>
-                  {hasChanges && (
-                    <div className="flex items-center space-x-2">
-                      <Button size="sm" variant="outline" onClick={handleResetChanges}>
-                        <RotateCcw className="w-4 h-4 mr-1" />
-                        Reset
-                      </Button>
-                      <Button size="sm" onClick={handleSaveChanges}>
-                        <Save className="w-4 h-4 mr-1" />
-                        Save Changes
-                      </Button>
+                  <div className="flex items-center space-x-2">
+                    <div className="group relative">
+                      <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center cursor-help hover:bg-blue-700 transition-colors duration-200">
+                        <Info className="w-3 h-3 text-white" />
+                      </div>
+                      <div className="absolute right-0 top-6 w-80 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 pointer-events-none">
+                        <h4 className="font-medium text-white mb-1">Why Target Companies?</h4>
+                        <p>Target companies help organize your networking efforts. Messages, contacts, meetings, and tasks are grouped by these companies across the app, making it easier to track your progress with specific organizations.</p>
+                        <div className="absolute -top-1 right-3 w-2 h-2 bg-gray-900 rotate-45"></div>
+                      </div>
                     </div>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <div className="flex items-start space-x-2">
-                    <Lightbulb className="w-5 h-5 text-blue-600 mt-0.5" />
-                    <div>
-                      <h4 className="font-medium text-blue-900 mb-1">Why Target Companies?</h4>
-                      <p className="text-sm text-blue-800">
-                        Target companies help organize your networking efforts. Messages, contacts, meetings, and tasks 
-                        are grouped by these companies across the app, making it easier to track your progress with 
-                        specific organizations.
-                      </p>
-                    </div>
+                    {hasChanges && (
+                      <div className="flex items-center space-x-2">
+                        <Button size="sm" variant="outline" onClick={handleResetChanges}>
+                          <RotateCcw className="w-4 h-4 mr-1" />
+                          Reset
+                        </Button>
+                        <Button size="sm" onClick={handleSaveChanges}>
+                          <Save className="w-4 h-4 mr-1" />
+                          Save Changes
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                </div>
-
+                </CardTitle>
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600"></div>
+              </CardHeader>
+              <CardContent className="space-y-6 pt-6">
                 {/* Current Target Companies */}
                 {targetCompanies.length > 0 && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                      Current Target Companies ({targetCompanies.length})
-                    </label>
                     <div className="flex flex-wrap gap-2">
                       {targetCompanies.map((company) => (
                         <Badge
@@ -406,7 +490,7 @@ const Settings = () => {
 
                 {/* Add from Popular Companies */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                  <label className="block text-sm font-medium text-gray-800 mb-3">
                     Add Popular Companies
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -428,7 +512,7 @@ const Settings = () => {
 
                 {/* Add Custom Company */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-800 mb-2">
                     Add Custom Company
                   </label>
                   <div className="flex space-x-2">
@@ -454,17 +538,18 @@ const Settings = () => {
             {/* Networking Preferences */}
             {user && (
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
+                <CardHeader className="relative">
+                  <CardTitle className="flex items-center space-x-2" style={{ marginBottom: '1px' }}>
                     <SettingsIcon className="w-5 h-5" />
                     <span>Networking Preferences</span>
                   </CardTitle>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600"></div>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Message Tone */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-800 mb-2">
                         Default Message Tone
                       </label>
                       <Select 
@@ -484,7 +569,7 @@ const Settings = () => {
 
                     {/* Reminder Frequency */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-800 mb-2">
                         Follow-up Reminder Frequency
                       </label>
                       <Select 
@@ -506,23 +591,60 @@ const Settings = () => {
 
                   {/* Commonality Priority Order */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-800 mb-2">
                       Commonality Priority Order
                     </label>
-                    <p className="text-sm text-gray-500 mb-3">
-                      This determines how AI prioritizes shared connections when suggesting introductions
+                    <p className="text-sm text-gray-600 mb-3">
+                      This determines how AI prioritizes shared connections when suggesting introductions. Drag to reorder.
                     </p>
                     <div className="space-y-2">
                       {user.preferences.commonalityOrder.map((commonality, index) => (
-                        <div key={commonality} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                          <span className="text-sm font-medium text-gray-600 w-6">#{index + 1}</span>
-                          <Building2 className="w-4 h-4 text-gray-500" />
-                          <span className="text-sm text-gray-700 flex-1 capitalize">
+                        <div
+                          key={commonality}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, index)}
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDrop(e, index)}
+                          onDragEnd={handleDragEnd}
+                          className={`flex items-center space-x-2 px-3 py-2 rounded-md cursor-move transition-all duration-200 ${
+                            draggedItem === index
+                              ? 'bg-blue-100 border border-blue-300 shadow-md'
+                              : 'bg-gray-100 hover:bg-gray-200 border border-transparent'
+                          }`}
+                        >
+                          <GripVertical className="w-3 h-3 text-gray-400" />
+                          <span className="text-xs font-medium text-gray-700 w-5">#{index + 1}</span>
+                          <Building2 className="w-3 h-3 text-gray-600" />
+                          <span className="text-xs text-gray-800 flex-1">
                             {commonality === 'employer' && 'Shared Employer'}
                             {commonality === 'education' && 'Same School/University'}
                             {commonality === 'mutual' && 'Mutual Connections'}
                             {commonality === 'event' && 'Same Events/Communities'}
                           </span>
+                          <div className="flex space-x-1">
+                            <button
+                              onClick={() => index > 0 && moveCommonalityItem(index, index - 1)}
+                              disabled={index === 0}
+                              className={`p-0.5 rounded ${
+                                index === 0
+                                  ? 'text-gray-300 cursor-not-allowed'
+                                  : 'text-gray-500 hover:text-blue-600 hover:bg-blue-50'
+                              }`}
+                            >
+                              <ChevronUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => index < user.preferences.commonalityOrder.length - 1 && moveCommonalityItem(index, index + 1)}
+                              disabled={index === user.preferences.commonalityOrder.length - 1}
+                              className={`p-0.5 rounded ${
+                                index === user.preferences.commonalityOrder.length - 1
+                                  ? 'text-gray-300 cursor-not-allowed'
+                                  : 'text-gray-500 hover:text-blue-600 hover:bg-blue-50'
+                              }`}
+                            >
+                              <ChevronDown className="w-3 h-3" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -531,123 +653,86 @@ const Settings = () => {
               </Card>
             )}
 
-            {/* Onboarding Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Info className="w-5 h-5" />
-                  <span>Onboarding Information</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <div className="flex items-start space-x-2">
-                    <Lightbulb className="w-5 h-5 text-blue-600 mt-0.5" />
-                    <div>
-                      <h4 className="font-medium text-blue-900 mb-1">Update Your Profile & Preferences</h4>
-                      <p className="text-sm text-blue-800">
-                        Re-run the onboarding process to update your networking goals, target companies,
-                        or import additional LinkedIn connections. This will help keep your AI recommendations
-                        current and relevant.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <h5 className="font-medium text-gray-900 mb-2">Current Setup:</h5>
-                    <div className="text-sm text-gray-700 space-y-1">
-                      {user && (
-                        <>
-                          <p>• Role: {roleLabels[user.role]}</p>
-                          <p>• Target Companies: {targetCompanies.length} selected</p>
-                          <p>• Message Tone: {user.preferences.draftTone}</p>
-                          <p>• Contacts: {(() => {
-                            const contacts = storage.getContacts();
-                            return contacts.length;
-                          })()} imported</p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="bg-green-50 rounded-lg p-3">
-                    <h5 className="font-medium text-green-900 mb-2">What You Can Update:</h5>
-                    <div className="text-sm text-green-800 space-y-1">
-                      <p>• Import new LinkedIn connections</p>
-                      <p>• Add or remove target companies</p>
-                      <p>• Update networking goals</p>
-                      <p>• Adjust message preferences</p>
-                    </div>
-                  </div>
-                </div>
-
-                <Button
-                  onClick={() => {
-                    // Clear onboarding completion flag to trigger onboarding flow
-                    localStorage.removeItem('connectorpro_onboarding_complete');
-                    
-                    // Redirect to home page which will show onboarding
-                    window.location.href = '/';
-                  }}
-                  className="w-full"
-                  size="lg"
-                >
-                  <Edit3 className="w-4 h-4 mr-2" />
-                  Edit Onboarding Information
-                </Button>
-
-                <div className="text-xs text-gray-500 text-center">
-                  This will take you through the setup process again while preserving your existing data
-                </div>
-              </CardContent>
-            </Card>
 
             {/* Data Import Options */}
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Link className="w-5 h-5" />
-                  <span>Import Your Network</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <div className="flex items-start space-x-2">
-                    <Lightbulb className="w-5 h-5 text-blue-600 mt-0.5" />
-                    <div>
-                      <h4 className="font-medium text-blue-900 mb-1">Import Your LinkedIn Network</h4>
-                      <p className="text-sm text-blue-800">
-                        Choose between direct LinkedIn API integration (requires LinkedIn Company Page) or
-                        file upload (works with any LinkedIn account). Upload CSV, Numbers, or Excel files to import your connections
-                        and help you organize your networking efforts.
-                      </p>
+              <CardHeader className="relative">
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2" style={{ marginBottom: '1px' }}>
+                    <Link className="w-5 h-5" />
+                    <span>Import Your Network</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        // This will be handled by the FileUploadHistory component
+                        const event = new CustomEvent('toggleUploadHistory');
+                        window.dispatchEvent(event);
+                      }}
+                      className="text-gray-600 hover:text-gray-800 text-xs"
+                    >
+                      <FileText className="w-3 h-3 mr-1" />
+                      Upload History
+                    </Button>
+                    <div className="group relative">
+                      <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center cursor-help hover:bg-blue-700 transition-colors duration-200">
+                        <Info className="w-3 h-3 text-white" />
+                      </div>
+                      <div className="absolute right-0 top-6 w-80 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 pointer-events-none">
+                        <h4 className="font-medium text-white mb-1">Import Your LinkedIn Network</h4>
+                        <p>Choose between direct LinkedIn API integration (requires LinkedIn Company Page) or file upload (works with any LinkedIn account). Upload CSV, Numbers, or Excel files to import your connections and help you organize your networking efforts.</p>
+                        <div className="absolute -top-1 right-3 w-2 h-2 bg-gray-900 rotate-45"></div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </CardTitle>
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600"></div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Import Options - Side by Side */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* LinkedIn API Integration */}
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-3">Option 1: LinkedIn API Integration</h3>
+                    <LinkedInIntegration
+                      onContactsImported={(contacts) => {
+                        console.log('Contacts imported via API:', contacts);
+                        // You could update the UI or show a success message here
+                      }}
+                    />
+                  </div>
 
-                {/* LinkedIn API Integration */}
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">Option 1: LinkedIn API Integration</h3>
-                  <LinkedInIntegration
-                    onContactsImported={(contacts) => {
-                      console.log('Contacts imported via API:', contacts);
-                      // You could update the UI or show a success message here
-                    }}
-                  />
-                </div>
-
-                {/* CSV Import Alternative */}
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">Option 2: CSV Upload (Recommended)</h3>
-                  <CSVImport
-                    onContactsImported={(contacts) => {
-                      console.log('Contacts imported via CSV:', contacts);
-                      // Trigger refresh of upload history and integration status
-                      handleUploadComplete();
-                    }}
-                  />
+                  {/* CSV Import Alternative */}
+                  <div>
+                    <div className="flex items-center space-x-2 mb-3">
+                      <h3 className="text-lg font-medium text-gray-900">Option 2: CSV Upload (Recommended)</h3>
+                      <div className="group relative">
+                        <div className="w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center cursor-help hover:bg-blue-700 transition-colors duration-200">
+                          <Info className="w-2.5 h-2.5 text-white" />
+                        </div>
+                        <div className="absolute left-0 top-6 w-80 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 pointer-events-none">
+                          <h4 className="font-medium text-white mb-2">How to get your LinkedIn CSV</h4>
+                          <ol className="space-y-1 text-xs">
+                            <li>1. Go to LinkedIn → Settings & Privacy → Data Privacy</li>
+                            <li>2. Click "Get a copy of your data"</li>
+                            <li>3. Select "Connections" and request your data</li>
+                            <li>4. Download the CSV file when ready (usually within 24 hours)</li>
+                            <li>5. Upload the CSV file below</li>
+                          </ol>
+                          <div className="absolute -top-1 left-3 w-2 h-2 bg-gray-900 rotate-45"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <CSVImport
+                      onContactsImported={(contacts) => {
+                        console.log('Contacts imported via CSV:', contacts);
+                        // Trigger refresh of upload history and integration status
+                        handleUploadComplete();
+                      }}
+                    />
+                  </div>
                 </div>
 
                 {/* File Upload History */}
@@ -666,16 +751,17 @@ const Settings = () => {
 
             {/* Gmail Integration */}
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
+              <CardHeader className="relative">
+                <CardTitle className="flex items-center space-x-2" style={{ marginBottom: '1px' }}>
                   <Mail className="w-5 h-5" />
                   <span>Gmail Integration</span>
                 </CardTitle>
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600"></div>
               </CardHeader>
               <CardContent>
                 <div className="bg-blue-50 rounded-lg p-4 mb-6">
                   <div className="flex items-start space-x-2">
-                    <Lightbulb className="w-5 h-5 text-blue-600 mt-0.5" />
+                    <Info className="w-5 h-5 text-blue-600 mt-0.5" />
                     <div>
                       <h4 className="font-medium text-blue-900 mb-1">Connect Your Gmail Account</h4>
                       <p className="text-sm text-blue-800">
@@ -697,16 +783,17 @@ const Settings = () => {
 
             {/* Google Calendar Integration */}
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
+              <CardHeader className="relative">
+                <CardTitle className="flex items-center space-x-2" style={{ marginBottom: '1px' }}>
                   <Calendar className="w-5 h-5" />
                   <span>Google Calendar Integration</span>
                 </CardTitle>
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600"></div>
               </CardHeader>
               <CardContent>
                 <div className="bg-blue-50 rounded-lg p-4 mb-6">
                   <div className="flex items-start space-x-2">
-                    <Lightbulb className="w-5 h-5 text-blue-600 mt-0.5" />
+                    <Info className="w-5 h-5 text-blue-600 mt-0.5" />
                     <div>
                       <h4 className="font-medium text-blue-900 mb-1">Connect Your Google Calendar</h4>
                       <p className="text-sm text-blue-800">
@@ -728,11 +815,12 @@ const Settings = () => {
 
             {/* Connected Integrations */}
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
+              <CardHeader className="relative">
+                <CardTitle className="flex items-center space-x-2" style={{ marginBottom: '1px' }}>
                   <CheckCircle className="w-5 h-5" />
                   <span>Integration Status</span>
                 </CardTitle>
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600"></div>
               </CardHeader>
               <CardContent>
                <div className="space-y-4" key={refreshTrigger}>
@@ -744,8 +832,8 @@ const Settings = () => {
                       </div>
                       <div>
                         <h3 className="font-medium text-gray-900">LinkedIn</h3>
-                        <p className="text-sm text-gray-700">Network analysis and contact import</p>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-sm text-gray-800">Network analysis and contact import</p>
+                        <p className="text-xs text-gray-600 mt-1">
                           Last imported: {(() => {
                             // Check new file upload history first (most recent method)
                             const fileUploadHistory = storage.getFileUploadHistory();
@@ -787,7 +875,7 @@ const Settings = () => {
                         <CheckCircle className="w-3 h-3 mr-1" />
                         Connected
                       </Badge>
-                      <div className="text-xs text-gray-500 space-y-1">
+                      <div className="text-xs text-gray-600 space-y-1">
                         <p>Total active contacts: {contactStats.totalActiveContacts}</p>
                         {(() => {
                           // Get the most recent successful upload for new contacts info
@@ -830,8 +918,8 @@ const Settings = () => {
                       </div>
                       <div>
                         <h3 className="font-medium text-gray-900">Gmail</h3>
-                        <p className="text-sm text-gray-700">Send introduction requests and follow-ups</p>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-sm text-gray-800">Send introduction requests and follow-ups</p>
+                        <p className="text-xs text-gray-600 mt-1">
                           {gmailStatus?.status === 'connected' && gmailStatus.email_address
                             ? `Connected: ${gmailStatus.email_address}`
                             : gmailStatus?.status === 'connected' && gmailStatus.last_connected
@@ -860,7 +948,7 @@ const Settings = () => {
                         )}
                       </Badge>
                       {gmailStatus?.error_message && (
-                        <p className="text-xs text-red-500 mt-1">{gmailStatus.error_message}</p>
+                        <p className="text-xs text-red-600 mt-1">{gmailStatus.error_message}</p>
                       )}
                     </div>
                   </div>
@@ -881,8 +969,8 @@ const Settings = () => {
                       </div>
                       <div>
                         <h3 className="font-medium text-gray-900">Google Calendar</h3>
-                        <p className="text-sm text-gray-700">Schedule meetings and manage events</p>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-sm text-gray-800">Schedule meetings and manage events</p>
+                        <p className="text-xs text-gray-600 mt-1">
                           {calendarStatus?.status === 'connected' && calendarStatus.email_address
                             ? `Connected: ${calendarStatus.email_address}`
                             : calendarStatus?.status === 'connected' && calendarStatus.last_connected
@@ -911,7 +999,7 @@ const Settings = () => {
                         )}
                       </Badge>
                       {calendarStatus?.error_message && (
-                        <p className="text-xs text-red-500 mt-1">{calendarStatus.error_message}</p>
+                        <p className="text-xs text-red-600 mt-1">{calendarStatus.error_message}</p>
                       )}
                     </div>
                   </div>
