@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthFlow } from '@/hooks/useAuthFlow';
@@ -9,40 +9,27 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Moon, Sun, Network, Loader2 } from 'lucide-react';
+import { Moon, Sun, Network } from 'lucide-react';
 import AuthGuard from '@/components/auth/AuthGuard';
 
-const Login = () => {
+const Signup = () => {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   
-  const { login, isAuthenticated } = useAuth();
-  const { handlePostAuthRedirect, getIntendedPath } = useAuthFlow();
+  const { register } = useAuth();
+  const { handlePostAuthRedirect } = useAuthFlow();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
-  const emailInputRef = useRef<HTMLInputElement>(null);
-
-  // Auto-focus email field on component mount
-  useEffect(() => {
-    if (emailInputRef.current) {
-      emailInputRef.current.focus();
-    }
-  }, []);
-
-  // Load remembered email on mount
-  useEffect(() => {
-    const rememberedEmail = localStorage.getItem('connectorpro_remembered_email');
-    if (rememberedEmail) {
-      setEmail(rememberedEmail);
-      setRememberMe(true);
-    }
-  }, []);
 
   const validateForm = () => {
+    if (!name.trim()) {
+      setError('Name is required');
+      return false;
+    }
     if (!email) {
       setError('Email is required');
       return false;
@@ -59,6 +46,10 @@ const Login = () => {
       setError('Password must be at least 6 characters long');
       return false;
     }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return false;
+    }
     return true;
   };
 
@@ -71,34 +62,21 @@ const Login = () => {
     }
 
     setIsLoading(true);
-    setError(''); // Clear any previous errors
     
     try {
-      const result = await login(email, password);
+      const result = await register(name.trim(), email, password);
       if (result.success) {
-        // Handle remember me functionality
-        if (rememberMe) {
-          localStorage.setItem('connectorpro_remembered_email', email);
-        } else {
-          localStorage.removeItem('connectorpro_remembered_email');
-        }
-        
-        // Handle post-authentication redirect
+        // New users always go to onboarding
         handlePostAuthRedirect(result.isNewUser);
       } else {
-        setError('Invalid email or password. Please check your credentials and try again.');
+        setError('Registration failed. Please try again.');
       }
-    } catch (err: any) {
-      console.error('Login error:', err);
-      setError(err.message || 'An error occurred during login. Please try again.');
+    } catch (err) {
+      setError('An error occurred during registration. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
-
-  // Show intended destination if available
-  const intendedPath = getIntendedPath();
-  const showRedirectMessage = intendedPath !== '/dashboard';
 
   return (
     <AuthGuard type="auth-only">
@@ -128,22 +106,11 @@ const Login = () => {
             <p className="text-muted-foreground">Your networking companion</p>
           </div>
 
-          {/* Redirect message */}
-          {showRedirectMessage && (
-            <div className="mb-4">
-              <Alert>
-                <AlertDescription>
-                  You'll be redirected to <strong>{intendedPath}</strong> after signing in.
-                </AlertDescription>
-              </Alert>
-            </div>
-          )}
-
           <Card>
             <CardHeader>
-              <CardTitle>Sign In</CardTitle>
+              <CardTitle>Create Account</CardTitle>
               <CardDescription>
-                Enter your email and password to access your account
+                Enter your information to create a new account and get started with onboarding
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -155,9 +122,21 @@ const Login = () => {
                 )}
                 
                 <div className="space-y-2">
+                  <Label htmlFor="name">Full Name</Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="Enter your full name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    disabled={isLoading}
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
-                    ref={emailInputRef}
                     id="email"
                     type="email"
                     placeholder="Enter your email"
@@ -165,7 +144,6 @@ const Login = () => {
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={isLoading}
                     required
-                    autoComplete="email"
                   />
                 </div>
                 
@@ -179,24 +157,20 @@ const Login = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading}
                     required
-                    autoComplete="current-password"
                   />
                 </div>
-
-                {/* Remember Me Checkbox */}
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="remember-me"
-                    checked={rememberMe}
-                    onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="Confirm your password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                     disabled={isLoading}
+                    required
                   />
-                  <Label
-                    htmlFor="remember-me"
-                    className="text-sm font-normal cursor-pointer"
-                  >
-                    Remember my email
-                  </Label>
                 </div>
                 
                 <Button
@@ -205,24 +179,24 @@ const Login = () => {
                   disabled={isLoading}
                 >
                   {isLoading ? (
-                    <div className="flex items-center justify-center space-x-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Signing in...</span>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin"></div>
+                      <span>Creating account...</span>
                     </div>
                   ) : (
-                    'Sign In'
+                    'Create Account'
                   )}
                 </Button>
               </form>
               
-              <div className="mt-6 text-center space-y-2">
+              <div className="mt-6 text-center">
                 <p className="text-sm text-muted-foreground">
-                  Don't have an account?{' '}
+                  Already have an account?{' '}
                   <Link
-                    to="/signup"
+                    to="/login"
                     className="text-primary hover:underline font-medium"
                   >
-                    Sign up
+                    Sign in
                   </Link>
                 </p>
               </div>
@@ -234,4 +208,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default Signup;

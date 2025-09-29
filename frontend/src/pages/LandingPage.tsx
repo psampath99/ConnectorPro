@@ -38,64 +38,118 @@ const NetworkVisualization: React.FC<NetworkVisualizationProps> = ({ containerId
   const animationIdRef = useRef<number | null>(null);
   const nodesRef = useRef<any[]>([]);
   const connectionsRef = useRef<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
-    // Load Three.js dynamically
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
-    script.onload = () => {
-      initVisualization();
+    let script: HTMLScriptElement | null = null;
+    
+    const loadThreeJS = async () => {
+      try {
+        setIsLoading(true);
+        setHasError(false);
+        
+        // Check if Three.js is already loaded
+        if (window.THREE) {
+          initVisualization();
+          return;
+        }
+
+        // Load Three.js dynamically with error handling
+        script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+        
+        script.onload = () => {
+          try {
+            initVisualization();
+          } catch (error) {
+            console.error('Three.js initialization error:', error);
+            setHasError(true);
+          }
+        };
+        
+        script.onerror = () => {
+          console.error('Failed to load Three.js');
+          setHasError(true);
+        };
+        
+        document.head.appendChild(script);
+      } catch (error) {
+        console.error('Error loading Three.js:', error);
+        setHasError(true);
+      }
     };
-    document.head.appendChild(script);
+
+    loadThreeJS();
 
     return () => {
       cleanup();
-      document.head.removeChild(script);
+      if (script && document.head.contains(script)) {
+        try {
+          document.head.removeChild(script);
+        } catch (error) {
+          console.warn('Error removing Three.js script:', error);
+        }
+      }
     };
   }, []);
 
   const initVisualization = () => {
-    if (!containerRef.current || !window.THREE) return;
-
-    const THREE = window.THREE;
-    const container = containerRef.current;
-
-    // Scene setup
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(
-      75,
-      container.offsetWidth / container.offsetHeight,
-      0.1,
-      1000
-    );
-    camera.position.z = 5;
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(container.offsetWidth, container.offsetHeight);
-    renderer.setClearColor(0x000000, 0);
-    container.appendChild(renderer.domElement);
-
-    sceneRef.current = scene;
-    rendererRef.current = renderer;
-
-    // Create network
-    createNetwork(THREE, scene);
-    
-    // Start animation
-    animate(THREE, scene, camera, renderer);
-
-    // Handle resize
-    const handleResize = () => {
-      if (container && camera && renderer) {
-        const width = container.offsetWidth;
-        const height = container.offsetHeight;
-        camera.aspect = width / height;
-        camera.updateProjectionMatrix();
-        renderer.setSize(width, height);
+    try {
+      if (!containerRef.current || !window.THREE) {
+        setHasError(true);
+        return;
       }
-    };
 
-    window.addEventListener('resize', handleResize);
+      const THREE = window.THREE;
+      const container = containerRef.current;
+
+      // Scene setup
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        container.offsetWidth / container.offsetHeight,
+        0.1,
+        1000
+      );
+      camera.position.z = 5;
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(container.offsetWidth, container.offsetHeight);
+      renderer.setClearColor(0x000000, 0);
+      container.appendChild(renderer.domElement);
+
+      sceneRef.current = scene;
+      rendererRef.current = renderer;
+
+      // Create network
+      createNetwork(THREE, scene);
+      
+      // Start animation
+      animate(THREE, scene, camera, renderer);
+
+      // Handle resize
+      const handleResize = () => {
+        try {
+          if (container && camera && renderer) {
+            const width = container.offsetWidth;
+            const height = container.offsetHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+          }
+        } catch (error) {
+          console.warn('Resize error:', error);
+        }
+      };
+
+      window.addEventListener('resize', handleResize);
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Visualization initialization error:', error);
+      setHasError(true);
+      setIsLoading(false);
+    }
   };
 
   const createNetwork = (THREE: any, scene: any) => {
@@ -200,13 +254,47 @@ const NetworkVisualization: React.FC<NetworkVisualizationProps> = ({ containerId
   };
 
   const cleanup = () => {
-    if (animationIdRef.current) {
-      cancelAnimationFrame(animationIdRef.current);
-    }
-    if (rendererRef.current && containerRef.current) {
-      containerRef.current.removeChild(rendererRef.current.domElement);
+    try {
+      if (animationIdRef.current) {
+        cancelAnimationFrame(animationIdRef.current);
+        animationIdRef.current = null;
+      }
+      if (rendererRef.current && containerRef.current && containerRef.current.contains(rendererRef.current.domElement)) {
+        containerRef.current.removeChild(rendererRef.current.domElement);
+      }
+      // Clear refs
+      sceneRef.current = null;
+      rendererRef.current = null;
+      nodesRef.current = [];
+      connectionsRef.current = [];
+    } catch (error) {
+      console.warn('Cleanup error:', error);
     }
   };
+
+  if (hasError) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500/10 to-purple-600/10 rounded-2xl">
+        <div className="text-center space-y-2">
+          <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto">
+            <Network className="w-8 h-8 text-blue-500" />
+          </div>
+          <p className="text-sm text-muted-foreground">Network visualization unavailable</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500/10 to-purple-600/10 rounded-2xl">
+        <div className="text-center space-y-2">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-sm text-muted-foreground">Loading visualization...</p>
+        </div>
+      </div>
+    );
+  }
 
   return <div ref={containerRef} className="w-full h-full" />;
 };
@@ -233,13 +321,19 @@ const LandingPage: React.FC = () => {
     setTheme(savedTheme);
     document.documentElement.setAttribute('data-theme', savedTheme);
 
-    // Check if user is returning
-    const userData = localStorage.getItem('connectorpro_user');
-    const onboardingComplete = localStorage.getItem('connectorpro_onboarding_complete');
+    // Enhanced user state detection on page load
+    const userState = getUserState();
     
-    if (userData && onboardingComplete) {
-      // Returning user - could redirect to dashboard or show different CTA
-      console.log('Returning user detected');
+    switch (userState) {
+      case 'new':
+        console.log('New user detected - ready for onboarding');
+        break;
+      case 'incomplete_onboarding':
+        console.log('Returning user with incomplete onboarding detected');
+        break;
+      case 'fully_authenticated':
+        console.log('Fully authenticated user detected - could auto-redirect or show different CTA');
+        break;
     }
   }, []);
 
@@ -269,17 +363,72 @@ const LandingPage: React.FC = () => {
     document.documentElement.setAttribute('data-theme', newTheme);
   };
 
-  const handleGetStarted = () => {
+  // Enhanced user state detection types
+  type UserState = 'new' | 'incomplete_onboarding' | 'fully_authenticated';
+
+  // Helper function to determine precise user state
+  const getUserState = (): UserState => {
     const userData = localStorage.getItem('connectorpro_user');
     const onboardingComplete = localStorage.getItem('connectorpro_onboarding_complete');
     
-    if (userData && onboardingComplete) {
-      // Returning user - go to dashboard
-      navigate('/dashboard');
-    } else {
-      // New user - show onboarding
-      setShowOnboarding(true);
+    if (!userData) {
+      return 'new';
     }
+    
+    if (userData && !onboardingComplete) {
+      return 'incomplete_onboarding';
+    }
+    
+    if (userData && onboardingComplete) {
+      return 'fully_authenticated';
+    }
+    
+    return 'new'; // fallback
+  };
+
+  // Enhanced authentication check with detailed state information
+  const isUserAuthenticated = (): boolean => {
+    return getUserState() === 'fully_authenticated';
+  };
+
+  // Helper function to check if user has any data (for incomplete onboarding detection)
+  const hasUserData = (): boolean => {
+    const userData = localStorage.getItem('connectorpro_user');
+    return !!userData;
+  };
+
+  // Enhanced Get Started button logic with three distinct user states
+  const handleGetStarted = () => {
+    const userState = getUserState();
+    
+    switch (userState) {
+      case 'new':
+        // New user - start onboarding flow
+        console.log('New user detected - starting onboarding');
+        setShowOnboarding(true);
+        break;
+        
+      case 'incomplete_onboarding':
+        // Returning user with incomplete onboarding - resume onboarding
+        console.log('User with incomplete onboarding detected - resuming onboarding');
+        setShowOnboarding(true);
+        break;
+        
+      case 'fully_authenticated':
+        // Fully authenticated user - go directly to dashboard
+        console.log('Fully authenticated user detected - redirecting to dashboard');
+        navigate('/dashboard');
+        break;
+        
+      default:
+        // Fallback to new user flow
+        console.log('Unknown user state - defaulting to new user flow');
+        setShowOnboarding(true);
+    }
+  };
+
+  const handleSignIn = () => {
+    navigate('/login');
   };
 
   const handleOnboardingComplete = (userData: any) => {
@@ -331,23 +480,56 @@ const LandingPage: React.FC = () => {
             }`}>
               <Network className="w-5 h-5 text-white" />
             </div>
-            <span className="text-xl font-bold">ConnectorPro</span>
+            <div className="flex flex-col">
+              <span className="text-xl font-bold">ConnectorPro</span>
+              <span className={`text-xs font-medium ${
+                theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+              }`}>
+                From Connections to Outcomes
+              </span>
+            </div>
           </div>
           
-          <button
-            onClick={toggleTheme}
-            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 ${
-              theme === 'dark' 
-                ? 'bg-slate-800 hover:bg-slate-700' 
-                : 'bg-white hover:bg-slate-100'
-            } shadow-lg`}
-          >
-            {theme === 'dark' ? (
-              <Sun className="w-5 h-5 text-yellow-500" />
-            ) : (
-              <Moon className="w-5 h-5 text-slate-600" />
+          <div className="flex items-center space-x-3">
+            {!isUserAuthenticated() && (
+              <div className="flex items-center space-x-3">
+                <Button
+                  onClick={handleSignIn}
+                  variant="outline"
+                  size="default"
+                  className={`transition-all duration-300 hover:scale-105 border-2 px-6 py-2 font-semibold ${
+                    theme === 'dark'
+                      ? 'border-blue-500 text-blue-400 hover:bg-blue-500/10 hover:border-blue-400'
+                      : 'border-blue-500 text-blue-600 hover:bg-blue-50 hover:border-blue-600'
+                  }`}
+                >
+                  Sign In
+                </Button>
+                <Button
+                  onClick={handleGetStarted}
+                  size="default"
+                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-2 font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                >
+                  Get Started Free
+                </Button>
+              </div>
             )}
-          </button>
+            
+            <button
+              onClick={toggleTheme}
+              className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 ${
+                theme === 'dark'
+                  ? 'bg-slate-800 hover:bg-slate-700'
+                  : 'bg-white hover:bg-slate-100'
+              } shadow-lg`}
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-5 h-5 text-yellow-500" />
+              ) : (
+                <Moon className="w-5 h-5 text-slate-600" />
+              )}
+            </button>
+          </div>
         </div>
       </header>
 

@@ -762,6 +762,9 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     storage.setOnboardingData(data, emailProvider);
     console.log('✅ Onboarding data saved to localStorage');
     
+    // Navigate to dashboard after completion
+    window.location.href = '/dashboard';
+    
     onComplete(user);
   };
 

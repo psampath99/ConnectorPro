@@ -1,7 +1,9 @@
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from typing import List, Optional, Dict, Any
 from models import Contact, FileUploadRecord, GmailConnection, UserTargetCompany, ToolOriginatedMessage
+from user_models import User, UserCreate, UserUpdate
 from bson import ObjectId
+from datetime import datetime, timedelta
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,6 +17,7 @@ class DatabaseService:
         self.calendar_connections_collection = database.calendar_connections
         self.target_companies_collection = database.target_companies
         self.tool_originated_messages_collection = database.tool_originated_messages
+        self.users_collection = database.users
     
     # Contact operations
     async def create_contact(self, contact: Contact) -> Contact:
@@ -349,3 +352,126 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"Error bulk checking tool-originated messages for user {user_id}: {e}")
             return {}
+    # User operations
+    async def create_user(self, user: User) -> User:
+        """Create a new user"""
+        user_dict = user.dict(exclude={'id'})
+        result = await self.users_collection.insert_one(user_dict)
+        user.id = str(result.inserted_id)
+        return user
+    
+    async def get_user_by_id(self, user_id: str) -> Optional[User]:
+        """Get a user by ID"""
+        try:
+            doc = await self.users_collection.find_one({"_id": ObjectId(user_id)})
+            if doc:
+                doc['id'] = str(doc['_id'])
+                del doc['_id']
+                return User(**doc)
+        except Exception as e:
+            logger.error(f"Error getting user by ID {user_id}: {e}")
+        return None
+    
+    async def get_user_by_email(self, email: str) -> Optional[User]:
+        """Get a user by email"""
+        try:
+            doc = await self.users_collection.find_one({"email": email})
+            if doc:
+                doc['id'] = str(doc['_id'])
+                del doc['_id']
+                return User(**doc)
+        except Exception as e:
+            logger.error(f"Error getting user by email {email}: {e}")
+        return None
+    
+    async def update_user(self, user_id: str, user_data: Dict) -> Optional[User]:
+        """Update a user"""
+        try:
+            user_data["updated_at"] = datetime.now()
+            result = await self.users_collection.update_one(
+                {"_id": ObjectId(user_id)},
+                {"$set": user_data}
+            )
+            if result.modified_count > 0:
+                return await self.get_user_by_id(user_id)
+        except Exception as e:
+            logger.error(f"Error updating user {user_id}: {e}")
+        return None
+    
+    async def delete_user(self, user_id: str) -> bool:
+        """Delete a user"""
+        try:
+            result = await self.users_collection.delete_one({"_id": ObjectId(user_id)})
+            return result.deleted_count > 0
+        except Exception as e:
+            logger.error(f"Error deleting user {user_id}: {e}")
+            return False
+    
+    async def update_user_login_success(self, user_id: str) -> bool:
+        """Update user after successful login"""
+        try:
+            result = await self.users_collection.update_one(
+                {"_id": ObjectId(user_id)},
+                {
+                    "$set": {
+                        "last_login": datetime.now(),
+                        "login_attempts": 0,
+                        "locked_until": None,
+                        "updated_at": datetime.now()
+                    }
+                }
+            )
+            return result.modified_count > 0
+        except Exception as e:
+            logger.error(f"Error updating user login success {user_id}: {e}")
+            return False
+    
+    async def increment_login_attempts(self, user_id: str) -> bool:
+        """Increment failed login attempts"""
+        try:
+            result = await self.users_collection.update_one(
+                {"_id": ObjectId(user_id)},
+                {
+                    "$inc": {"login_attempts": 1},
+                    "$set": {"updated_at": datetime.now()}
+                }
+            )
+            return result.modified_count > 0
+        except Exception as e:
+            logger.error(f"Error incrementing login attempts {user_id}: {e}")
+            return False
+    
+    async def lock_user_account(self, user_id: str, lock_duration_minutes: int) -> bool:
+        """Lock user account for specified duration"""
+        try:
+            locked_until = datetime.now() + timedelta(minutes=lock_duration_minutes)
+            result = await self.users_collection.update_one(
+                {"_id": ObjectId(user_id)},
+                {
+                    "$set": {
+                        "locked_until": locked_until,
+                        "updated_at": datetime.now()
+                    }
+                }
+            )
+            return result.modified_count > 0
+        except Exception as e:
+            logger.error(f"Error locking user account {user_id}: {e}")
+            return False
+    
+    async def update_user_last_login(self, user_id: str) -> bool:
+        """Update user's last login timestamp"""
+        try:
+            result = await self.users_collection.update_one(
+                {"_id": ObjectId(user_id)},
+                {
+                    "$set": {
+                        "last_login": datetime.now(),
+                        "updated_at": datetime.now()
+                    }
+                }
+            )
+            return result.modified_count > 0
+        except Exception as e:
+            logger.error(f"Error updating user last login {user_id}: {e}")
+            return False

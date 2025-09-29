@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -6,16 +6,35 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Network } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Network, Loader2 } from 'lucide-react';
 
 const ModernLogin = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   
   const { login } = useAuth();
   const navigate = useNavigate();
+  const emailInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus email field on component mount
+  useEffect(() => {
+    if (emailInputRef.current) {
+      emailInputRef.current.focus();
+    }
+  }, []);
+
+  // Load remembered email on mount
+  useEffect(() => {
+    const rememberedEmail = localStorage.getItem('connectorpro_remembered_email');
+    if (rememberedEmail) {
+      setEmail(rememberedEmail);
+      setRememberMe(true);
+    }
+  }, []);
 
   const validateForm = () => {
     if (!email) {
@@ -42,16 +61,25 @@ const ModernLogin = () => {
     }
 
     setIsLoading(true);
+    setError(''); // Clear any previous errors
     
     try {
-      const success = await login(email, password);
-      if (success) {
+      const result = await login(email, password);
+      if (result.success) {
+        // Handle remember me functionality
+        if (rememberMe) {
+          localStorage.setItem('connectorpro_remembered_email', email);
+        } else {
+          localStorage.removeItem('connectorpro_remembered_email');
+        }
+        
         navigate('/dashboard');
       } else {
-        setError('Invalid email or password');
+        setError('Invalid email or password. Please check your credentials and try again.');
       }
-    } catch (err) {
-      setError('An error occurred during login. Please try again.');
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(err.message || 'An error occurred during login. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -88,6 +116,7 @@ const ModernLogin = () => {
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
+                  ref={emailInputRef}
                   id="email"
                   type="email"
                   placeholder="Enter your email"
@@ -95,6 +124,7 @@ const ModernLogin = () => {
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading}
                   required
+                  autoComplete="email"
                 />
               </div>
               
@@ -113,17 +143,34 @@ const ModernLogin = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isLoading}
                   required
+                  autoComplete="current-password"
                 />
               </div>
+
+              {/* Remember Me Checkbox */}
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="remember-me"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                  disabled={isLoading}
+                />
+                <Label
+                  htmlFor="remember-me"
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  Remember my email
+                </Label>
+              </div>
               
-              <Button 
-                type="submit" 
-                className="w-full" 
+              <Button
+                type="submit"
+                className="w-full"
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin"></div>
+                  <div className="flex items-center justify-center space-x-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
                     <span>Signing in...</span>
                   </div>
                 ) : (

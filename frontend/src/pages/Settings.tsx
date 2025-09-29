@@ -15,6 +15,8 @@ import { GmailIntegration } from '@/components/integrations/GmailIntegration';
 import { CalendarIntegration } from '@/components/integrations/CalendarIntegration';
 import { storage } from '@/lib/storage';
 import { User } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Settings as SettingsIcon,
   Building2,
@@ -54,6 +56,7 @@ const roleLabels = {
 
 const Settings = () => {
   const navigate = useNavigate();
+  const { user: authUser, isLoading: authLoading } = useAuth();
   const [user, setUser] = useState<User | null>(null);
   const [targetCompanies, setTargetCompanies] = useState<string[]>([]);
   const [customCompany, setCustomCompany] = useState('');
@@ -61,6 +64,7 @@ const Settings = () => {
   const [originalTargetCompanies, setOriginalTargetCompanies] = useState<string[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
+  const [isDataLoading, setIsDataLoading] = useState(true);
   const [contactStats, setContactStats] = useState({
     totalActiveContacts: 0,
     latestUpload: null
@@ -126,17 +130,54 @@ const Settings = () => {
   };
 
   useEffect(() => {
+    // Wait for auth to load before initializing data
+    if (authLoading) return;
+    
+    if (!authUser) {
+      console.warn('Settings: No authenticated user found');
+      navigate('/login');
+      return;
+    }
+
+    // Load user data from storage (which has full User type with preferences)
     const userData = storage.getUser();
+    if (!userData) {
+      console.warn('Settings: No user data in storage');
+      navigate('/login');
+      return;
+    }
+
+    // Validate user data
+    if (!userData.email) {
+      console.warn('Settings: User email is missing', userData);
+    }
+    if (!userData.name) {
+      console.warn('Settings: User name is missing', userData);
+    }
+
     setUser(userData);
 
-    // Load target companies from API first, then fallback to localStorage
-    fetchTargetCompanies();
+    const initializeData = async () => {
+      setIsDataLoading(true);
+      try {
+        // Load target companies from API first, then fallback to localStorage
+        await fetchTargetCompanies();
 
-    // Load contact stats and integration statuses
-    fetchContactStats();
-    fetchGmailStatus();
-    fetchCalendarStatus();
-  }, []);
+        // Load contact stats and integration statuses
+        await Promise.all([
+          fetchContactStats(),
+          fetchGmailStatus(),
+          fetchCalendarStatus()
+        ]);
+      } catch (error) {
+        console.error('Settings: Error initializing data:', error);
+      } finally {
+        setIsDataLoading(false);
+      }
+    };
+
+    initializeData();
+  }, [authUser, authLoading, navigate]);
 
   // Fetch contact stats from backend
   const fetchContactStats = async () => {
@@ -299,7 +340,7 @@ const Settings = () => {
 
   // Function to handle commonality order changes
   const moveCommonalityItem = (fromIndex: number, toIndex: number) => {
-    if (!user) return;
+    if (!user?.preferences?.commonalityOrder) return;
     
     const newOrder = [...user.preferences.commonalityOrder];
     const [movedItem] = newOrder.splice(fromIndex, 1);
@@ -336,6 +377,71 @@ const Settings = () => {
     fetchContactStats(); // Also refresh contact stats
   };
 
+  // Show loading state while auth or data is loading
+  if (authLoading || isDataLoading) {
+    return (
+      <div className="flex h-screen bg-gray-200">
+        <Sidebar />
+        <main className="flex-1 overflow-auto">
+          <div className="p-6">
+            <div className="space-y-6">
+              {/* Header */}
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+                <p className="text-gray-700">Manage your account preferences and networking settings</p>
+              </div>
+
+              {/* Loading skeletons */}
+              <Card>
+                <CardHeader>
+                  <Skeleton className="h-6 w-64" />
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[...Array(6)].map((_, i) => (
+                      <div key={i}>
+                        <Skeleton className="h-4 w-20 mb-2" />
+                        <Skeleton className="h-10 w-full" />
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <Skeleton className="h-6 w-48" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-32 w-full" />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Show error state if no user after loading
+  if (!authUser || !user) {
+    return (
+      <div className="flex h-screen bg-gray-200">
+        <Sidebar />
+        <main className="flex-1 overflow-auto">
+          <div className="p-6">
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+                <p className="text-red-600">Error: User data not available. Please try logging in again.</p>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-gray-200">
       <Sidebar />
@@ -349,7 +455,7 @@ const Settings = () => {
             </div>
 
             {/* Profile and Account Information */}
-            {user && (
+            {authUser && (
               <Card>
                 <CardHeader className="relative">
                   <div className="flex items-center justify-between">
@@ -389,7 +495,7 @@ const Settings = () => {
                           First Name
                         </label>
                         <Input
-                          value={user.name.split(' ')[0] || ''}
+                          value={user?.name?.split(' ')[0] || ''}
                           disabled
                           className="bg-white text-sm"
                         />
@@ -399,7 +505,7 @@ const Settings = () => {
                           Last Name
                         </label>
                         <Input
-                          value={user.name.split(' ').slice(1).join(' ') || ''}
+                          value={user?.name?.split(' ').slice(1).join(' ') || ''}
                           disabled
                           className="bg-white text-sm"
                         />
@@ -408,7 +514,7 @@ const Settings = () => {
                         <label className="block text-lg font-medium text-gray-900 mb-1">
                           Email Address
                         </label>
-                        <Input value={user.email} disabled className="bg-white text-sm" />
+                        <Input value={user?.email || ''} disabled className="bg-white text-sm" />
                       </div>
                       <div>
                         <label className="block text-lg font-medium text-gray-900 mb-1">
@@ -424,13 +530,13 @@ const Settings = () => {
                         <label className="block text-lg font-medium text-gray-900 mb-1">
                           Role
                         </label>
-                        <Input value={roleLabels[user.role]} disabled className="bg-white text-sm" />
+                        <Input value={user?.role ? roleLabels[user.role] : 'N/A'} disabled className="bg-white text-sm" />
                       </div>
                       <div>
                         <label className="block text-lg font-medium text-gray-900 mb-1">
                           Message Tone
                         </label>
-                        <Input value={user.preferences.draftTone} disabled className="bg-white text-sm" />
+                        <Input value={user?.preferences?.draftTone || 'professional'} disabled className="bg-white text-sm" />
                       </div>
                     </div>
                   </div>
@@ -575,10 +681,12 @@ const Settings = () => {
                       <label className="text-lg font-medium text-gray-900">
                         Persona
                       </label>
-                      <Select value={user.role} onValueChange={(value: any) => {
-                        const updatedUser = { ...user, role: value };
-                        setUser(updatedUser);
-                        storage.setUser(updatedUser);
+                      <Select value={user?.role || 'job_seeker'} onValueChange={(value: any) => {
+                        if (user) {
+                          const updatedUser = { ...user, role: value };
+                          setUser(updatedUser);
+                          storage.setUser(updatedUser);
+                        }
                       }}>
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select persona" />
@@ -597,7 +705,7 @@ const Settings = () => {
                         Message Tone
                       </label>
                       <Select
-                        value={user.preferences.draftTone}
+                        value={user?.preferences?.draftTone || 'professional'}
                         onValueChange={(value: any) => updateUserPreferences({ draftTone: value })}
                       >
                         <SelectTrigger className="w-full">
@@ -617,7 +725,7 @@ const Settings = () => {
                         Follow-up Reminder Frequency
                       </label>
                       <Select
-                        value={user.preferences.reminderFrequency.toString()}
+                        value={(user?.preferences?.reminderFrequency || 7).toString()}
                         onValueChange={(value) => updateUserPreferences({ reminderFrequency: parseInt(value) })}
                       >
                         <SelectTrigger className="w-full">
@@ -650,7 +758,7 @@ const Settings = () => {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      {user.preferences.commonalityOrder.map((commonality, index) => (
+                      {(user?.preferences?.commonalityOrder || []).map((commonality, index) => (
                         <div
                           key={commonality}
                           draggable
@@ -686,10 +794,10 @@ const Settings = () => {
                               <ChevronUp className="w-3 h-3" />
                             </button>
                             <button
-                              onClick={() => index < user.preferences.commonalityOrder.length - 1 && moveCommonalityItem(index, index + 1)}
-                              disabled={index === user.preferences.commonalityOrder.length - 1}
+                              onClick={() => user?.preferences?.commonalityOrder && index < user.preferences.commonalityOrder.length - 1 && moveCommonalityItem(index, index + 1)}
+                              disabled={!user?.preferences?.commonalityOrder || index === user.preferences.commonalityOrder.length - 1}
                               className={`p-0.5 rounded ${
-                                index === user.preferences.commonalityOrder.length - 1
+                                !user?.preferences?.commonalityOrder || index === user.preferences.commonalityOrder.length - 1
                                   ? 'text-gray-300 cursor-not-allowed'
                                   : 'text-gray-500 hover:text-blue-600 hover:bg-blue-50'
                               }`}

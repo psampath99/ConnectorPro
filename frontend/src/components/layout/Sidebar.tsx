@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: Home },
+  { name: 'Dashboard', href: '/dashboard', icon: Home },
   { name: 'Feed', href: '/feed', icon: Activity },
   { name: 'Contacts', href: '/contacts', icon: Users },
   { name: 'Meetings', href: '/meetings', icon: Calendar },
@@ -46,7 +46,8 @@ export function Sidebar() {
     setUser(userData);
   }, []);
 
-  const getInitials = (name: string) => {
+  const getInitials = (name?: string) => {
+    if (!name || typeof name !== 'string') return '';
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
@@ -119,7 +120,7 @@ export function Sidebar() {
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
             <span className="text-sm font-medium text-white">
-              {user ? getInitials(user.name) : 'U'}
+              {user && user.name ? getInitials(user.name) : 'U'}
             </span>
           </div>
           {!collapsed && user && (

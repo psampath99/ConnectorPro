@@ -1,9 +1,12 @@
+# Load environment variables FIRST before any imports that depend on them
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from contextlib import asynccontextmanager
-import os
-from dotenv import load_dotenv
 import logging
 import time
 import asyncio
@@ -24,13 +27,16 @@ from models import (
 from database import DatabaseService
 from csv_service_enhanced import CSVService
 from auth import get_current_user, get_current_user_strict, AuthService
+from enhanced_auth import (
+    EnhancedAuthService, enhanced_auth_service, get_enhanced_auth_service,
+    get_current_user_enhanced, get_current_user_optional, limiter, auth_rate_limit
+)
+from user_models import UserCreate, UserLogin, TokenResponse, UserResponse, RefreshTokenRequest
+from slowapi.errors import RateLimitExceeded
 from gmail_service import gmail_service
 from calendar_service import calendar_service
 from llm_service import llm_service, LLMQuery, NetworkDataContext, LLMProvider
 from pydantic import BaseModel
-
-# Load environment variables
-load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -1113,6 +1119,7 @@ class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: dict
+    expires_in: int  # Token expiration time in seconds
 
 class RegisterRequest(BaseModel):
     email: str
@@ -1129,13 +1136,17 @@ async def login(request: LoginRequest):
         user_id = "demo-user-123"
         access_token = AuthService.create_access_token(user_id, request.email)
         
+        # Get token expiration time from environment
+        expires_in = int(os.getenv("JWT_EXPIRES_IN", 900))
+        
         return LoginResponse(
             access_token=access_token,
             user={
                 "id": user_id,
                 "email": request.email,
                 "name": request.email.split("@")[0].title()
-            }
+            },
+            expires_in=expires_in
         )
     except Exception as e:
         logger.error(f"Login error: {e}")
@@ -1151,13 +1162,17 @@ async def register(request: RegisterRequest):
         user_id = f"user-{hash(request.email) % 10000}"
         access_token = AuthService.create_access_token(user_id, request.email)
         
+        # Get token expiration time from environment
+        expires_in = int(os.getenv("JWT_EXPIRES_IN", 900))
+        
         return LoginResponse(
             access_token=access_token,
             user={
                 "id": user_id,
                 "email": request.email,
                 "name": request.name
-            }
+            },
+            expires_in=expires_in
         )
     except Exception as e:
         logger.error(f"Registration error: {e}")
