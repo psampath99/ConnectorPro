@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { SingleScreenOnboarding } from '@/components/onboarding/SingleScreenOnboarding';
+import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow';
 import { storage } from '@/lib/storage';
 import { 
   Network, 
@@ -453,7 +453,7 @@ const LandingPage: React.FC = () => {
   ];
 
   if (showOnboarding) {
-    return <SingleScreenOnboarding onComplete={handleOnboardingComplete} />;
+    return <OnboardingFlow onComplete={handleOnboardingComplete} />;
   }
 
   return (

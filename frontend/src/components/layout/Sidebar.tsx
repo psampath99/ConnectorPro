@@ -5,18 +5,20 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { storage } from '@/lib/storage';
 import { User } from '@/types';
-import { 
-  Home, 
-  Users, 
-  MessageSquare, 
-  FileText, 
-  Calendar, 
-  CheckSquare, 
+import {
+  Home,
+  Users,
+  MessageSquare,
+  FileText,
+  Calendar,
+  CheckSquare,
   Settings,
   Network,
   Mail,
-  Activity
+  Activity,
+  LogOut
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
@@ -38,13 +40,8 @@ const roleLabels = {
 
 export function Sidebar() {
   const location = useLocation();
+  const { user, logout, isAuthenticated } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const userData = storage.getUser();
-    setUser(userData);
-  }, []);
 
   const getInitials = (name?: string) => {
     if (!name || typeof name !== 'string') return '';
@@ -80,7 +77,7 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-1">
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {navigation.map((item) => {
           const isActive = location.pathname === item.href;
           return (
@@ -115,21 +112,37 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* User Profile */}
+      {/* Footer Area */}
       <div className="p-4 border-t border-gray-200">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-            <span className="text-sm font-medium text-white">
-              {user && user.name ? getInitials(user.name) : 'U'}
-            </span>
-          </div>
-          {!collapsed && user && (
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
-              <p className="text-xs text-gray-500 truncate">{roleLabels[user.role]}</p>
+        {/* User Profile */}
+        {isAuthenticated && user && (
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+              <span className="text-sm font-medium text-white">
+                {user.name ? getInitials(user.name) : 'U'}
+              </span>
             </div>
-          )}
-        </div>
+            {!collapsed && (
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
+                {/* <p className="text-xs text-gray-500 truncate">{user && user.role ? roleLabels[user.role] : ''}</p> */}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Logout Button */}
+        {isAuthenticated && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full flex items-center justify-start text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+            onClick={logout}
+          >
+            <LogOut className="w-5 h-5 mr-3" />
+            {!collapsed && <span>Logout</span>}
+          </Button>
+        )}
       </div>
     </div>
   );

@@ -19,7 +19,7 @@ import {
   X
 } from 'lucide-react';
 
-interface SingleScreenOnboardingData {
+export interface Step1UserProfileData {
   persona: User['role'] | '';
   firstName: string;
   lastName: string;
@@ -29,8 +29,8 @@ interface SingleScreenOnboardingData {
   targetCompanies: string[];
 }
 
-interface SingleScreenOnboardingProps {
-  onComplete: (data: SingleScreenOnboardingData) => void;
+interface Step1UserProfileProps {
+  onComplete: (data: Step1UserProfileData) => void;
   onCancel?: () => void;
 }
 
@@ -166,8 +166,8 @@ const commonCompanies = [
   'Notion', 'Spotify', 'Twitter', 'TikTok', 'Snapchat', 'Pinterest', 'Dropbox', 'Square'
 ];
 
-export function SingleScreenOnboarding({ onComplete, onCancel }: SingleScreenOnboardingProps) {
-  const [data, setData] = useState<SingleScreenOnboardingData>({
+export function Step1_UserProfile({ onComplete, onCancel }: Step1UserProfileProps) {
+  const [data, setData] = useState<Step1UserProfileData>({
     persona: '',
     firstName: '',
     lastName: '',
@@ -284,19 +284,7 @@ export function SingleScreenOnboarding({ onComplete, onCancel }: SingleScreenOnb
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-4xl">
-        <CardHeader className="text-center">
-          <div className="flex items-center justify-center mb-4">
-            <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Network className="w-7 h-7 text-white" />
-            </div>
-          </div>
-          <CardTitle className="text-2xl">Welcome to ConnectorPro</CardTitle>
-          <p className="text-gray-600">Your AI-powered LinkedIn assistant to unlock the warmest paths to opportunity.</p>
-        </CardHeader>
-
-        <CardContent className="space-y-12">
+    <div className="space-y-12">
           {/* Step 1: Persona Selection - Now at the top */}
           <div className="space-y-6">
             <div>
@@ -467,91 +455,6 @@ export function SingleScreenOnboarding({ onComplete, onCancel }: SingleScreenOnb
           </div>
         </div>
 
-          {/* Step 4: Target Companies - Optional */}
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold mb-3">Target Companies</h3>
-              <p className="text-gray-600 text-sm mb-2">Optional: Select companies you'd like to connect with people at.</p>
-              <p className="text-gray-500 text-xs">You can skip this step and add companies later in your dashboard.</p>
-            </div>
-
-            <div className="space-y-4">
-                  {/* Popular Companies */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Popular Companies
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {commonCompanies.map((company) => (
-                        <Badge
-                          key={company}
-                          variant={data.targetCompanies.includes(company) ? "default" : "outline"}
-                          className="cursor-pointer hover:bg-blue-100"
-                          onClick={() => handleCompanyToggle(company)}
-                        >
-                          {company}
-                          {data.targetCompanies.includes(company) && (
-                            <CheckCircle className="w-3 h-3 ml-1" />
-                          )}
-                        </Badge>
-                      ))}
-                    </div>
-              </div>
-
-                  {/* Add Custom Company */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Add Custom Company
-                    </label>
-                    <div className="flex space-x-2">
-                      <Input
-                        placeholder="Enter company name"
-                        autoComplete="organization"
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
-                            handleAddCustomCompany((e.target as HTMLInputElement).value);
-                            (e.target as HTMLInputElement).value = '';
-                          }
-                        }}
-                      />
-                      <Button
-                        variant="outline"
-                        onClick={(e) => {
-                          const input = (e.target as HTMLElement).parentElement?.querySelector('input');
-                          if (input) {
-                            handleAddCustomCompany(input.value);
-                            input.value = '';
-                          }
-                        }}
-                      >
-                        Add
-                      </Button>
-                    </div>
-              </div>
-
-                  {/* Selected Companies */}
-              {data.targetCompanies.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Selected Companies ({data.targetCompanies.length})
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {data.targetCompanies.map((company) => (
-                          <Badge
-                            key={company}
-                            variant="default"
-                            className="cursor-pointer bg-blue-600 hover:bg-blue-700"
-                            onClick={() => handleCompanyToggle(company)}
-                          >
-                            {company}
-                            <span className="ml-1 text-xs">×</span>
-                          </Badge>
-                        ))}
-                      </div>
-                </div>
-              )}
-            </div>
-          </div>
 
           {/* Action Buttons */}
           <div className="flex justify-between pt-6 border-t">
@@ -574,8 +477,6 @@ export function SingleScreenOnboarding({ onComplete, onCancel }: SingleScreenOnb
           <div className="text-center">
             <p className="text-sm text-gray-500">Step 2 of 5 - Complete Profile & Goals</p>
           </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

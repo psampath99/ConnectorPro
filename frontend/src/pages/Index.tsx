@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { SingleScreenOnboarding } from '@/components/onboarding/SingleScreenOnboarding';
+import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow';
 import { storage } from '@/lib/storage';
 import { User } from '@/types';
 import { 
@@ -113,7 +113,7 @@ const Index = () => {
   }
 
   if (showOnboarding) {
-    return <SingleScreenOnboarding onComplete={handleOnboardingComplete} />;
+    return <OnboardingFlow onComplete={handleOnboardingComplete} />;
   }
 
   return (

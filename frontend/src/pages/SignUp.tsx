@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
-import { Moon, Sun, Network } from 'lucide-react';
+import { Moon, Sun, Network, Eye, EyeOff } from 'lucide-react';
 import AuthGuard from '@/components/auth/AuthGuard';
 
 const Signup = () => {
@@ -19,38 +19,90 @@ const Signup = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [confirmPasswordError, setConfirmPasswordError] = useState('');
   
   const { register } = useAuth();
   const { handlePostAuthRedirect } = useAuthFlow();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
+  const validatePassword = (pwd: string) => {
+    if (!pwd) {
+      return 'Password is required';
+    }
+    if (pwd.length < 8) {
+      return 'Password must be at least 8 characters long';
+    }
+    return '';
+  };
+
+  const validateConfirmPassword = (confirmPwd: string, pwd: string) => {
+    if (!confirmPwd) {
+      return 'Please confirm your password';
+    }
+    if (confirmPwd !== pwd) {
+      return 'Passwords do not match';
+    }
+    return '';
+  };
+
   const validateForm = () => {
+    let isValid = true;
+    
+    // Clear previous errors
+    setError('');
+    setPasswordError('');
+    setConfirmPasswordError('');
+
     if (!name.trim()) {
       setError('Name is required');
-      return false;
+      isValid = false;
     }
     if (!email) {
       setError('Email is required');
-      return false;
+      isValid = false;
     }
     if (!email.includes('@')) {
       setError('Please enter a valid email address');
-      return false;
+      isValid = false;
     }
-    if (!password) {
-      setError('Password is required');
-      return false;
+
+    const pwdError = validatePassword(password);
+    if (pwdError) {
+      setPasswordError(pwdError);
+      isValid = false;
     }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long');
-      return false;
+
+    const confirmPwdError = validateConfirmPassword(confirmPassword, password);
+    if (confirmPwdError) {
+      setConfirmPasswordError(confirmPwdError);
+      isValid = false;
     }
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return false;
+
+    return isValid;
+  };
+
+  const handlePasswordChange = (value: string) => {
+    setPassword(value);
+    if (passwordError) {
+      const error = validatePassword(value);
+      setPasswordError(error);
     }
-    return true;
+    if (confirmPassword && confirmPasswordError) {
+      const confirmError = validateConfirmPassword(confirmPassword, value);
+      setConfirmPasswordError(confirmError);
+    }
+  };
+
+  const handleConfirmPasswordChange = (value: string) => {
+    setConfirmPassword(value);
+    if (confirmPasswordError) {
+      const error = validateConfirmPassword(value, password);
+      setConfirmPasswordError(error);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -149,28 +201,68 @@ const Signup = () => {
                 
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={isLoading}
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => handlePasswordChange(e.target.value)}
+                      disabled={isLoading}
+                      required
+                      className={passwordError ? "border-red-500 focus:border-red-500" : ""}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={isLoading}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </div>
+                  {passwordError && (
+                    <p className="text-sm text-red-500 mt-1">{passwordError}</p>
+                  )}
                 </div>
                 
                 <div className="space-y-2">
                   <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    placeholder="Confirm your password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    disabled={isLoading}
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      id="confirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder="Confirm your password"
+                      value={confirmPassword}
+                      onChange={(e) => handleConfirmPasswordChange(e.target.value)}
+                      disabled={isLoading}
+                      required
+                      className={confirmPasswordError ? "border-red-500 focus:border-red-500" : ""}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      disabled={isLoading}
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </div>
+                  {confirmPasswordError && (
+                    <p className="text-sm text-red-500 mt-1">{confirmPasswordError}</p>
+                  )}
                 </div>
                 
                 <Button
