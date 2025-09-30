@@ -546,52 +546,50 @@ const LandingPage: React.FC = () => {
           </div>
           
           <div className="flex items-center space-x-3">
-            {!isUserAuthenticated() && (
-              <div className="flex items-center space-x-3">
-                <Button
-                  onClick={handleDemoAccount}
-                  disabled={isLoading}
-                  variant="outline"
-                  size="default"
-                  className={`transition-all duration-300 hover:scale-105 border-2 px-6 py-2 font-semibold ${
-                    theme === 'dark'
-                      ? 'border-green-500 text-green-400 hover:bg-green-500/10 hover:border-green-400'
-                      : 'border-green-500 text-green-600 hover:bg-green-50 hover:border-green-600'
-                  }`}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Loading...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-4 h-4 mr-2" />
-                      Demo Account
-                    </>
-                  )}
-                </Button>
-                <Button
-                  onClick={handleSignIn}
-                  variant="outline"
-                  size="default"
-                  className={`transition-all duration-300 hover:scale-105 border-2 px-6 py-2 font-semibold ${
-                    theme === 'dark'
-                      ? 'border-blue-500 text-blue-400 hover:bg-blue-500/10 hover:border-blue-400'
-                      : 'border-blue-500 text-blue-600 hover:bg-blue-50 hover:border-blue-600'
-                  }`}
-                >
-                  Sign In
-                </Button>
-                <Button
-                  onClick={handleGetStarted}
-                  size="default"
-                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-2 font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-                >
-                  Get Started Free
-                </Button>
-              </div>
-            )}
+            <div className="flex items-center space-x-3">
+              <Button
+                onClick={handleDemoAccount}
+                disabled={isLoading}
+                variant="outline"
+                size="default"
+                className={`transition-all duration-300 hover:scale-105 border-2 px-6 py-2 font-semibold ${
+                  theme === 'dark'
+                    ? 'border-green-500 text-green-400 hover:bg-green-500/10 hover:border-green-400'
+                    : 'border-green-500 text-green-600 hover:bg-green-50 hover:border-green-600'
+                }`}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 mr-2" />
+                    Demo Account
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={handleSignIn}
+                variant="outline"
+                size="default"
+                className={`transition-all duration-300 hover:scale-105 border-2 px-6 py-2 font-semibold ${
+                  theme === 'dark'
+                    ? 'border-blue-500 text-blue-400 hover:bg-blue-500/10 hover:border-blue-400'
+                    : 'border-blue-500 text-blue-600 hover:bg-blue-50 hover:border-blue-600'
+                }`}
+              >
+                Sign In
+              </Button>
+              <Button
+                onClick={handleGetStarted}
+                size="default"
+                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-2 font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+              >
+                Get Started Free
+              </Button>
+            </div>
             
             <button
               onClick={toggleTheme}
