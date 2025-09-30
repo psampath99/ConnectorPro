@@ -54,6 +54,90 @@ const roleLabels = {
   sales_rep: 'Sales Representative'
 };
 
+// Networking goals definitions (from onboarding)
+const goalsByPersona = {
+  job_seeker: [
+    {
+      id: 'research_referrals',
+      title: 'Research Companies & Build Referral Network',
+      description: 'Learn about target companies while building relationships for referrals',
+      strategy: 'Casual outreach to employees at all levels'
+    },
+    {
+      id: 'hiring_decision_makers',
+      title: 'Connect with Hiring Decision-Makers',
+      description: 'Get formal introductions to hiring managers and team leads',
+      strategy: 'Credible bridge paths to decision-makers'
+    },
+    {
+      id: 'expand_network',
+      title: 'Expand Long-Term Professional Network',
+      description: 'Build strategic relationships for future career opportunities',
+      strategy: 'Industry-wide networking across companies'
+    }
+  ],
+  consultant: [
+    {
+      id: 'revive_relationships',
+      title: 'Revive Past Client Relationships',
+      description: 'Reconnect with former clients and colleagues for referrals',
+      strategy: 'Warm follow-ups with existing connections'
+    },
+    {
+      id: 'generate_referrals',
+      title: 'Generate New Business Referrals',
+      description: 'Build relationships that lead to consulting opportunities',
+      strategy: 'Strategic networking for business development'
+    },
+    {
+      id: 'expand_network',
+      title: 'Expand Professional Network',
+      description: 'Build long-term relationships in your industry',
+      strategy: 'Industry-focused relationship building'
+    }
+  ],
+  community_manager: [
+    {
+      id: 'event_networking',
+      title: 'Facilitate Event Networking',
+      description: 'Connect attendees and create valuable introductions',
+      strategy: 'Community-focused relationship facilitation'
+    },
+    {
+      id: 'sponsor_relationships',
+      title: 'Manage Sponsor Relationships',
+      description: 'Build and maintain partnerships with event sponsors',
+      strategy: 'Partnership-focused networking'
+    },
+    {
+      id: 'community_growth',
+      title: 'Grow Community Engagement',
+      description: 'Expand community reach and member connections',
+      strategy: 'Growth-focused community building'
+    }
+  ],
+  sales_rep: [
+    {
+      id: 'warm_introductions',
+      title: 'Get Warm Introductions to Prospects',
+      description: 'Leverage network for introductions to potential customers',
+      strategy: 'Bridge paths to decision-makers'
+    },
+    {
+      id: 'leverage_relationships',
+      title: 'Leverage Existing Relationships',
+      description: 'Turn current connections into sales opportunities',
+      strategy: 'Relationship-to-revenue conversion'
+    },
+    {
+      id: 'expand_network',
+      title: 'Expand Sales Network',
+      description: 'Build relationships for future sales opportunities',
+      strategy: 'Strategic sales networking'
+    }
+  ]
+};
+
 const Settings = () => {
   const navigate = useNavigate();
   const { user: authUser, isLoading: authLoading } = useAuth();
@@ -65,6 +149,7 @@ const Settings = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [isDataLoading, setIsDataLoading] = useState(true);
+  const [networkingGoals, setNetworkingGoals] = useState<string[]>([]);
   const [contactStats, setContactStats] = useState({
     totalActiveContacts: 0,
     latestUpload: null
@@ -156,6 +241,10 @@ const Settings = () => {
     }
 
     setUser(userData);
+
+    // Load networking goals from onboarding data
+    const onboardingData = storage.getOnboardingData();
+    setNetworkingGoals(onboardingData.networkingGoals || []);
 
     const initializeData = async () => {
       setIsDataLoading(true);
@@ -539,6 +628,67 @@ const Settings = () => {
                         <Input value={user?.preferences?.draftTone || 'professional'} disabled className="bg-white text-sm" />
                       </div>
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Networking Goals from Onboarding */}
+            {networkingGoals.length > 0 && user?.role && (
+              <Card>
+                <CardHeader className="relative">
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2" style={{ marginBottom: '1px' }}>
+                      <Target className="w-5 h-5" />
+                      <span>Your Networking Goals</span>
+                    </div>
+                    <div className="group relative">
+                      <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center cursor-help hover:bg-blue-700 transition-colors duration-200">
+                        <Info className="w-3 h-3 text-white" />
+                      </div>
+                      <div className="absolute right-0 top-6 w-80 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 pointer-events-none">
+                        <h4 className="font-medium text-white mb-1">Your Selected Goals</h4>
+                        <p>These are the networking goals you selected during onboarding. They help guide your networking strategy and message recommendations.</p>
+                        <div className="absolute -top-1 right-3 w-2 h-2 bg-gray-900 rotate-45"></div>
+                      </div>
+                    </div>
+                  </CardTitle>
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600"></div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4">
+                    {networkingGoals.map((goalId) => {
+                      const availableGoals = goalsByPersona[user.role] || [];
+                      const goal = availableGoals.find(g => g.id === goalId);
+                      
+                      if (!goal) return null;
+                      
+                      return (
+                        <div key={goalId} className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                          <div className="flex items-start space-x-3">
+                            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                              <CheckCircle className="w-4 h-4 text-white" />
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="font-medium text-blue-900 mb-1">{goal.title}</h4>
+                              <p className="text-sm text-blue-800 mb-2">{goal.description}</p>
+                              <p className="text-xs text-blue-700 italic">Strategy: {goal.strategy}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  <div className="bg-gray-50 rounded-lg p-4 mt-4">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Lightbulb className="w-4 h-4 text-yellow-600" />
+                      <span className="text-sm font-medium text-gray-900">Tip</span>
+                    </div>
+                    <p className="text-xs text-gray-700">
+                      Your networking goals influence how ConnectorPro prioritizes recommendations and crafts messages.
+                      To update these goals, you can restart the onboarding process using the edit button in your profile section above.
+                    </p>
                   </div>
                 </CardContent>
               </Card>

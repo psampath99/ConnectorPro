@@ -26,6 +26,15 @@ const Login = () => {
   const navigate = useNavigate();
   const emailInputRef = useRef<HTMLInputElement>(null);
 
+  // Handle redirect after authentication state changes
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log('🔍 [DEBUG] User authenticated, redirecting...');
+      const intendedPath = getIntendedPath();
+      navigate(intendedPath, { replace: true });
+    }
+  }, [isAuthenticated, navigate, getIntendedPath]);
+
   // Auto-focus email field on component mount
   useEffect(() => {
     if (emailInputRef.current) {
@@ -83,8 +92,8 @@ const Login = () => {
           localStorage.removeItem('connectorpro_remembered_email');
         }
         
-        // Handle post-authentication redirect
-        handlePostAuthRedirect(result.isNewUser);
+        // Redirect will be handled by useEffect when isAuthenticated changes
+        console.log('🔍 [DEBUG] Login successful, waiting for auth state update...');
       } else {
         setError('Invalid email or password. Please check your credentials and try again.');
       }

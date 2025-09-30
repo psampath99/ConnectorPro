@@ -52,6 +52,22 @@ export const useAuthFlow = (options: AuthFlowOptions = {}) => {
     const intendedPath = getIntendedPath();
     const hasOnboarding = hasCompletedOnboarding();
 
+    // --- Test Override ---
+    // This flag skips the standard onboarding flow for new users and redirects them
+    // directly to the settings page. This is for testing purposes only.
+    // To re-enable the normal onboarding flow, set this to `false`.
+    const SKIP_ONBOARDING_FOR_NEW_USERS = true;
+
+    if (isNewUser && SKIP_ONBOARDING_FOR_NEW_USERS) {
+      navigate('/settings', { replace: true });
+      toast({
+        title: "Welcome! Skipping onboarding for testing.",
+        description: "You have been redirected to the settings page.",
+      });
+      return;
+    }
+    // --- End Test Override ---
+
     if (isNewUser || !hasOnboarding) {
       // New users or users who haven't completed onboarding go to onboarding
       if (location.pathname !== '/onboarding') {
@@ -75,6 +91,7 @@ export const useAuthFlow = (options: AuthFlowOptions = {}) => {
 
   /**
    * Handle authentication state changes
+   * Only run when authentication status actually changes, not on every render
    */
   useEffect(() => {
     if (isLoading) return;
@@ -83,7 +100,7 @@ export const useAuthFlow = (options: AuthFlowOptions = {}) => {
     if (isAuthenticated && (location.pathname === '/login' || location.pathname === '/signup')) {
       handlePostAuthRedirect();
     }
-  }, [isAuthenticated, isLoading, location.pathname, handlePostAuthRedirect]);
+  }, [isAuthenticated, isLoading]); // Removed location.pathname and handlePostAuthRedirect to prevent re-renders
 
   /**
    * Redirect to login with current path stored

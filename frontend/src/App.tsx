@@ -7,6 +7,8 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import AuthGuard from "@/components/auth/AuthGuard";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import LandingPage from "./pages/LandingPage";
 import Index from "./pages/Index";
 import Feed from "./pages/Feed";
@@ -14,13 +16,30 @@ import Contacts from "./pages/Contacts";
 import Messages from "./pages/Messages";
 import Meetings from "./pages/Meetings";
 import Tasks from "./pages/Tasks";
-import Network from "./pages/Network";
+import AIAssistant from "./pages/AIAssistant";
 import Settings from "./pages/Settings";
 import CalendarCallback from "./pages/CalendarCallback";
 import Login from "./pages/Login";
 import Signup from "./pages/SignUp";
 import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
 import NotFound from "./pages/NotFound";
+
+// Demo Settings component that ensures demo context is set
+const DemoSettings = () => {
+  const { isDemoUser, loginAsDemo } = useAuth();
+  
+  useEffect(() => {
+    console.log('🔍 [DEBUG] DemoSettings component mounted, isDemoUser:', isDemoUser);
+    
+    // If not already a demo user, set up demo context
+    if (!isDemoUser) {
+      console.log('🔍 [DEBUG] Setting up demo context via loginAsDemo');
+      loginAsDemo();
+    }
+  }, [isDemoUser, loginAsDemo]);
+  
+  return <Settings />;
+};
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,15 +50,22 @@ const queryClient = new QueryClient({
   },
 });
 
-const App = () => (
-  <ErrorBoundary>
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <AuthProvider>
+const App = () => {
+  // Instrumentation: Track App mount/unmount cycles
+  useEffect(() => {
+    console.log('[MOUNT] App');
+    return () => console.log('[UNMOUNT] App');
+  }, []);
+
+  return (
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <AuthProvider>
               <Routes>
                 {/* Public landing page - accessible to everyone */}
                 <Route
@@ -49,6 +75,12 @@ const App = () => (
                       <LandingPage />
                     </AuthGuard>
                   }
+                />
+                
+                {/* Demo route - bypasses all authentication */}
+                <Route
+                  path="/demo"
+                  element={<DemoSettings />}
                 />
               <Route
                 path="/login"
@@ -132,17 +164,17 @@ const App = () => (
                 }
               />
               <Route
-                path="/network"
+                path="/ai-assistant"
                 element={
                   <AuthGuard type="protected" requireOnboarding={true}>
-                    <Network />
+                    <AIAssistant />
                   </AuthGuard>
                 }
               />
               <Route
                 path="/settings"
                 element={
-                  <AuthGuard type="protected" requireOnboarding={true}>
+                  <AuthGuard type="protected" requireOnboarding={false}>
                     <Settings />
                   </AuthGuard>
                 }
@@ -167,13 +199,14 @@ const App = () => (
                   </AuthGuard>
                 }
               />
-            </Routes>
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
-  </ErrorBoundary>
-);
+              </Routes>
+            </AuthProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+    </ErrorBoundary>
+  );
+};
 
 export default App;

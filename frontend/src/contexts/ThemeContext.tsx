@@ -25,6 +25,12 @@ interface ThemeProviderProps {
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [theme, setThemeState] = useState<Theme>('light');
 
+  // Instrumentation: Track ThemeProvider mount/unmount cycles
+  useEffect(() => {
+    console.log('[MOUNT] ThemeProvider');
+    return () => console.log('[UNMOUNT] ThemeProvider');
+  }, []);
+
   useEffect(() => {
     // Check for saved theme preference or default to light mode
     const savedTheme = localStorage.getItem('connectorpro_theme') as Theme;
@@ -56,11 +62,11 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     setTheme(newTheme);
   };
 
-  const value: ThemeContextType = {
+  const value: ThemeContextType = React.useMemo(() => ({
     theme,
     toggleTheme,
     setTheme
-  };
+  }), [theme, toggleTheme, setTheme]);
 
   return (
     <ThemeContext.Provider value={value}>

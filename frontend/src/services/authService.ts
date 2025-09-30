@@ -161,6 +161,11 @@ class AuthService {
    */
   async login(email: string, password: string): Promise<{ user: User; token: string }> {
     try {
+      console.log('🔍 [DEBUG] Login attempt started');
+      console.log('🔍 [DEBUG] Email:', email);
+      console.log('🔍 [DEBUG] Password length:', password.length);
+      console.log('🔍 [DEBUG] API URL:', `${API_BASE_URL}/api/v1/auth/login`);
+      
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: 'POST',
         headers: {
@@ -169,8 +174,12 @@ class AuthService {
         body: JSON.stringify({ email, password }),
       });
 
+      console.log('🔍 [DEBUG] Login response status:', response.status);
+      console.log('🔍 [DEBUG] Login response ok:', response.ok);
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.log('🔍 [DEBUG] Login error response:', errorData);
         throw new AuthError(
           errorData.detail || 'Login failed. Please check your credentials.',
           response.status
@@ -178,6 +187,7 @@ class AuthService {
       }
 
       const data: LoginResponse = await response.json();
+      console.log('🔍 [DEBUG] Login successful, user data:', data.user);
       
       // Store authentication data with backend expiration time
       this.storeAuthData(data.access_token, data.user, data.expires_in);
@@ -188,10 +198,11 @@ class AuthService {
       };
     } catch (error) {
       if (error instanceof AuthError) {
+        console.log('🔍 [DEBUG] AuthError thrown:', error.message);
         throw error;
       }
       
-      console.error('Login error:', error);
+      console.error('🔍 [DEBUG] Unexpected login error:', error);
       throw new AuthError('Network error. Please check your connection and try again.');
     }
   }

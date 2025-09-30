@@ -16,14 +16,20 @@ interface AuthGuardProps {
  * - 'auth-only': Only accessible to unauthenticated users (login/signup)
  * - 'protected': Only accessible to authenticated users (dashboard, etc.)
  */
-const AuthGuard: React.FC<AuthGuardProps> = ({ 
-  children, 
-  type, 
-  requireOnboarding = false 
+const AuthGuard: React.FC<AuthGuardProps> = ({
+  children,
+  type,
+  requireOnboarding = false
 }) => {
-  const { user, isLoading, isAuthenticated, isInitialized } = useAuth();
+  const { user, isLoading, isAuthenticated, isInitialized, isDemoUser } = useAuth();
   const location = useLocation();
   const { hasCompletedOnboarding, getIntendedPath } = useAuthFlow();
+
+  // Instrumentation: Track AuthGuard mount/unmount cycles
+  useEffect(() => {
+    console.log('[MOUNT] AuthGuard', type);
+    return () => console.log('[UNMOUNT] AuthGuard', type);
+  }, [type]);
 
   // Store intended destination for protected routes
   useEffect(() => {
@@ -64,6 +70,11 @@ const AuthGuard: React.FC<AuthGuardProps> = ({
     case 'auth-only':
       // Auth-only routes (login/signup) should redirect authenticated users
       if (isAuthenticated) {
+        // Special handling for demo users - always redirect to settings
+        if (isDemoUser) {
+          return <Navigate to="/settings" replace />;
+        }
+        
         const hasOnboarding = hasCompletedOnboarding();
         
         if (!hasOnboarding) {
@@ -85,8 +96,11 @@ const AuthGuard: React.FC<AuthGuardProps> = ({
         return <Navigate to="/login" replace state={{ from: location }} />;
       }
 
-      // Check if onboarding is required for this route
-      if (requireOnboarding) {
+      // Demo users can access all protected routes normally
+      // The initial redirect to Settings is handled by the /demo route in App.tsx
+
+      // Check if onboarding is required for this route (skip for demo users)
+      if (requireOnboarding && !isDemoUser) {
         const hasOnboarding = hasCompletedOnboarding();
         
         if (!hasOnboarding && location.pathname !== '/onboarding') {

@@ -13,7 +13,7 @@ import {
   Calendar,
   CheckSquare,
   Settings,
-  Network,
+  Bot,
   Mail,
   Activity,
   LogOut
@@ -27,7 +27,7 @@ const navigation = [
   { name: 'Meetings', href: '/meetings', icon: Calendar },
   { name: 'Messages', href: '/messages', icon: MessageSquare },
   { name: 'Tasks', href: '/tasks', icon: CheckSquare },
-  { name: 'Network', href: '/network', icon: Network },
+  { name: 'AI Assistant', href: '/ai-assistant', icon: Bot },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
@@ -59,7 +59,7 @@ export function Sidebar() {
           <div className="flex flex-col">
             <div className="flex items-center space-x-2 mb-1">
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <Network className="w-5 h-5 text-white" />
+                <Bot className="w-5 h-5 text-white" />
               </div>
               <span className="font-semibold text-gray-900">ConnectorPro</span>
             </div>

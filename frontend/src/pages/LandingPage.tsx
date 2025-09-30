@@ -7,17 +7,21 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow';
 import { storage } from '@/lib/storage';
-import { 
-  Network, 
-  Sun, 
-  Moon, 
-  Target, 
-  Users, 
-  Briefcase, 
+import { authService } from '@/services/authService';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from '@/hooks/use-toast';
+import {
+  Network,
+  Sun,
+  Moon,
+  Target,
+  Users,
+  Briefcase,
   TrendingUp,
   CheckCircle,
   X,
-  Loader2
+  Loader2,
+  Play
 } from 'lucide-react';
 
 // Three.js types
@@ -313,6 +317,7 @@ const LandingPage: React.FC = () => {
     targetCompanies: ''
   });
   const [isLoading, setIsLoading] = useState(false);
+  const { loginAsDemo } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -431,6 +436,56 @@ const LandingPage: React.FC = () => {
     navigate('/login');
   };
 
+  const handleDemoAccount = async () => {
+    setIsLoading(true);
+    try {
+      console.log('🔍 [DEBUG] Demo account setup started - direct navigation approach');
+      
+      // Create comprehensive demo user data using Sampath Prema's account
+      const demoUser = {
+        id: 'demo-user-sampath',
+        email: 'sampath.prema@gmail.com',
+        name: 'Sampath Prema',
+        role: 'job_seeker',
+        preferences: {
+          draftTone: 'professional',
+          reminderFrequency: 7,
+          commonalityOrder: ['employer', 'education', 'mutual', 'event']
+        }
+      };
+      
+      // Set demo mode flags FIRST
+      localStorage.setItem('connectorpro_demo_mode', 'true');
+      localStorage.setItem('connectorpro_onboarding_complete', 'true');
+      localStorage.setItem('connectorpro_user', JSON.stringify(demoUser));
+      localStorage.setItem('connectorpro_token', 'demo-token-' + Date.now());
+      
+      // Set demo target companies
+      const demoTargetCompanies = ['Google', 'Meta', 'Apple', 'Microsoft', 'Amazon'];
+      localStorage.setItem('connectorpro_target_companies', JSON.stringify(demoTargetCompanies));
+      
+      console.log('🔍 [DEBUG] Demo data stored, navigating directly to /demo');
+      
+      toast({
+        title: "Welcome to Demo Mode!",
+        description: "You're now exploring ConnectorPro with Sampath Prema's demo account.",
+      });
+      
+      // Navigate directly to demo route
+      navigate('/demo', { replace: true });
+      
+    } catch (error: any) {
+      console.error('🔍 [DEBUG] Demo setup error:', error);
+      toast({
+        title: "Demo Account Error",
+        description: "Failed to load demo account. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleOnboardingComplete = (userData: any) => {
     console.log('Onboarding completed:', userData);
     setShowOnboarding(false);
@@ -494,6 +549,29 @@ const LandingPage: React.FC = () => {
             {!isUserAuthenticated() && (
               <div className="flex items-center space-x-3">
                 <Button
+                  onClick={handleDemoAccount}
+                  disabled={isLoading}
+                  variant="outline"
+                  size="default"
+                  className={`transition-all duration-300 hover:scale-105 border-2 px-6 py-2 font-semibold ${
+                    theme === 'dark'
+                      ? 'border-green-500 text-green-400 hover:bg-green-500/10 hover:border-green-400'
+                      : 'border-green-500 text-green-600 hover:bg-green-50 hover:border-green-600'
+                  }`}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4 mr-2" />
+                      Demo Account
+                    </>
+                  )}
+                </Button>
+                <Button
                   onClick={handleSignIn}
                   variant="outline"
                   size="default"
@@ -546,13 +624,38 @@ const LandingPage: React.FC = () => {
             }`}>
               Transform your professional relationships into strategic advantages with AI-powered insights and seamless integration.
             </p>
-            <Button
-              onClick={handleGetStarted}
-              size="lg"
-              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-4 text-lg rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-            >
-              Get Started – It's Free
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Button
+                onClick={handleDemoAccount}
+                disabled={isLoading}
+                size="lg"
+                className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-8 py-4 text-lg rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Loading Demo...
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-5 h-5 mr-2" />
+                    Try Demo Account
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={handleGetStarted}
+                size="lg"
+                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-4 text-lg rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+              >
+                Get Started – It's Free
+              </Button>
+            </div>
+            <p className={`text-sm mt-4 ${
+              theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+            }`}>
+              Demo account includes sample data from Sampath Prema's network
+            </p>
           </div>
         </section>
 

@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { NetworkQueryInterface } from '@/components/network/NetworkQueryInterface';
+import { AIAssistantQueryInterface } from '@/components/ai-assistant/AIAssistantQueryInterface';
 import {
-  Network as NetworkIcon,
+  Bot as BotIcon,
   Users,
   Building2,
   Target,
@@ -12,7 +12,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-const Network = () => {
+const AIAssistant = () => {
   const [targetCompanies, setTargetCompanies] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   
@@ -177,7 +177,7 @@ const Network = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">
-                  Professional Network
+                  AI Assistant
                 </h1>
                 <p className="text-gray-600">
                   AI-powered networking assistant with comprehensive contact analytics
@@ -193,7 +193,7 @@ const Network = () => {
                   {analytics.isLoadingAnalytics ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : (
-                    <NetworkIcon className="w-4 h-4 mr-2" />
+                    <BotIcon className="w-4 h-4 mr-2" />
                   )}
                   Refresh Analytics
                 </Button>
@@ -266,8 +266,8 @@ const Network = () => {
               </div>
             )}
 
-            {/* Network Query Interface */}
-            <NetworkQueryInterface className="mt-6" />
+            {/* AI Assistant Query Interface */}
+            <AIAssistantQueryInterface className="mt-6" />
           </div>
         </div>
 
@@ -276,4 +276,4 @@ const Network = () => {
   );
 };
 
-export default Network;
+export default AIAssistant;

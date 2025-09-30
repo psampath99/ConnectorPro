@@ -19,7 +19,7 @@ import {
   Filter
 } from 'lucide-react';
 
-interface NetworkQuery {
+interface AIAssistantQuery {
   id: string;
   query: string;
   timestamp: Date;
@@ -48,12 +48,12 @@ interface ContactInfo {
   linkedinUrl?: string;
 }
 
-interface NetworkQueryInterfaceProps {
+interface AIAssistantQueryInterfaceProps {
   className?: string;
 }
 
-export function NetworkQueryInterface({ className }: NetworkQueryInterfaceProps) {
-  const [queries, setQueries] = useState<NetworkQuery[]>([]);
+export function AIAssistantQueryInterface({ className }: AIAssistantQueryInterfaceProps) {
+  const [queries, setQueries] = useState<AIAssistantQuery[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -115,48 +115,14 @@ export function NetworkQueryInterface({ className }: NetworkQueryInterfaceProps)
     }
   };
 
-  // Transform LLM response data to match frontend expectations
+  // RAG-based backend now returns data directly from CSV, so we can use it as-is.
+  // The transformLLMData function is now simplified to pass data through.
   const transformLLMData = (data: any, queryType: string): any => {
-    if (!data) return null;
-    
-    switch (queryType) {
-      case 'company_ranking':
-        // Transform grouped company data to ranking format
-        if (typeof data === 'object' && !Array.isArray(data)) {
-          return Object.entries(data).map(([company, contacts]: [string, any]) => ({
-            company,
-            contactCount: Array.isArray(contacts) ? contacts.length : (contacts?.length || 0),
-            isTargetCompany: false // Could be enhanced with target company info
-          })).sort((a, b) => b.contactCount - a.contactCount);
-        }
-        return data;
-        
-      case 'company_contacts':
-      case 'contact_list':
-        // Transform contact data to expected format
-        if (typeof data === 'object' && !Array.isArray(data)) {
-          // If it's grouped by company, flatten to contact list
-          const allContacts: ContactInfo[] = [];
-          Object.values(data).forEach((contacts: any) => {
-            if (Array.isArray(contacts)) {
-              contacts.forEach((contact: any) => {
-                allContacts.push({
-                  name: contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim(),
-                  title: contact.title || 'No title',
-                  company: contact.company || '',
-                  degree: contact.degree || 1,
-                  linkedinUrl: contact.linkedinUrl || contact.linkedin_url
-                });
-              });
-            }
-          });
-          return allContacts;
-        }
-        return data;
-        
-      default:
-        return data;
-    }
+    // The new RAG backend returns data in a direct format (e.g., list of dicts).
+    // We no longer need complex transformations. We'll pass the data directly
+    // and handle rendering dynamically in the `renderResponse` function.
+    console.log("RAG-based data received for query type:", queryType, data);
+    return data;
   };
 
   const handleSendQuery = async () => {
@@ -170,7 +136,7 @@ export function NetworkQueryInterface({ className }: NetworkQueryInterfaceProps)
     const response = await processQueryWithLLM(queryText);
     
     // Create query record
-    const newQuery: NetworkQuery = {
+    const newQuery: AIAssistantQuery = {
       id: `query-${Date.now()}`,
       query: queryText,
       timestamp: new Date(),
@@ -189,107 +155,42 @@ export function NetworkQueryInterface({ className }: NetworkQueryInterfaceProps)
   };
 
   const renderResponse = (response: QueryResponse) => {
-    switch (response.visualType) {
-      case 'table':
-        if (response.type === 'company_ranking') {
-          const companies = response.data as CompanyRanking[];
-          return (
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <BarChart3 className="w-5 h-5 text-blue-600" />
-                <h4 className="font-semibold text-gray-900">{response.title}</h4>
-              </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Rank</TableHead>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Contacts</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {companies.map((company, index) => (
-                    <TableRow key={company.company}>
-                      <TableCell className="font-medium">#{index + 1}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <Building2 className="w-4 h-4 text-gray-500" />
-                          <span>{company.company}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">
-                          {company.contactCount} contacts
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {company.isTargetCompany ? (
-                          <Badge variant="default">Target</Badge>
-                        ) : (
-                          <Badge variant="outline">Regular</Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          );
-        }
-        break;
-        
-      case 'cards':
-        if (response.type === 'contact_list') {
-          const contacts = response.data as ContactInfo[];
-          return (
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Users className="w-5 h-5 text-green-600" />
-                <h4 className="font-semibold text-gray-900">{response.title}</h4>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {contacts.map((contact, index) => (
-                  <Card key={index} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h5 className="font-medium text-gray-900">{contact.name}</h5>
-                          <p className="text-sm text-gray-600 mt-1">{contact.title}</p>
-                          <div className="flex items-center space-x-2 mt-2">
-                            <Building2 className="w-3 h-3 text-gray-400" />
-                            <span className="text-xs text-gray-500">{contact.company}</span>
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end space-y-1">
-                          <Badge variant={contact.degree === 1 ? 'default' : 'secondary'} className="text-xs">
-                            {contact.degree}° connection
-                          </Badge>
-                          {contact.linkedinUrl && (
-                            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
-                              LinkedIn
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          );
-        }
-        break;
-        
-      case 'text':
-      default:
-        return (
-          <div className="space-y-2">
+    // The new RAG-based backend returns CSV-like data, which is best displayed in a table.
+    // This function now dynamically creates a table from the response data.
+    if (response.visualType === 'table' && Array.isArray(response.data) && response.data.length > 0) {
+      const headers = Object.keys(response.data);
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <BarChart3 className="w-5 h-5 text-blue-600" />
             <h4 className="font-semibold text-gray-900">{response.title}</h4>
-            <p className="text-gray-600">{response.summary}</p>
           </div>
-        );
+          <p className="text-sm text-gray-600">{response.summary}</p>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {headers.map(header => <TableHead key={header}>{header}</TableHead>)}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {response.data.map((row: any, rowIndex: number) => (
+                <TableRow key={rowIndex}>
+                  {headers.map(header => <TableCell key={header}>{row[header]}</TableCell>)}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      );
     }
+    
+    // Fallback for non-table data or empty data
+    return (
+      <div className="space-y-2">
+        <h4 className="font-semibold text-gray-900">{response.title}</h4>
+        <p className="text-gray-600">{response.summary || 'No data to display.'}</p>
+      </div>
+    );
   };
 
   const suggestedQueries = [
@@ -305,7 +206,7 @@ export function NetworkQueryInterface({ className }: NetworkQueryInterfaceProps)
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
           <MessageSquare className="w-5 h-5 text-blue-600" />
-          <span>Ask About Your Network</span>
+          <span>Ask Your AI Assistant</span>
         </CardTitle>
         <p className="text-sm text-gray-600">
           Ask natural language questions about your contacts and get visual insights
@@ -405,7 +306,7 @@ export function NetworkQueryInterface({ className }: NetworkQueryInterfaceProps)
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Ask about your network... (e.g., 'Show me top 10 companies')"
+              placeholder="Ask your AI Assistant... (e.g., 'Show me top 10 companies')"
               className="flex-1"
               disabled={isProcessing}
             />

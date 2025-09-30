@@ -401,7 +401,20 @@ export function Step1_UserProfile({ onComplete, onCancel }: Step1UserProfileProp
                     </label>
                     <Input
                       value={data.firstName}
-                      onChange={(e) => setData(prev => ({ ...prev, firstName: e.target.value }))}
+                      onChange={(e) => {
+                        const firstName = e.target.value;
+                        setData(prev => {
+                          const lastName = prev.lastName;
+                          const linkedinUrl = firstName && lastName
+                            ? `https://www.linkedin.com/in/${firstName.toLowerCase().replace(/\s+/g, '')}${lastName.toLowerCase().replace(/\s+/g, '')}`
+                            : prev.linkedinProfileUrl;
+                          return {
+                            ...prev,
+                            firstName,
+                            linkedinProfileUrl: linkedinUrl
+                          };
+                        });
+                      }}
                       placeholder="Enter your first name"
                       autoComplete="given-name"
                     />
@@ -412,7 +425,20 @@ export function Step1_UserProfile({ onComplete, onCancel }: Step1UserProfileProp
                     </label>
                     <Input
                       value={data.lastName}
-                      onChange={(e) => setData(prev => ({ ...prev, lastName: e.target.value }))}
+                      onChange={(e) => {
+                        const lastName = e.target.value;
+                        setData(prev => {
+                          const firstName = prev.firstName;
+                          const linkedinUrl = firstName && lastName
+                            ? `https://www.linkedin.com/in/${firstName.toLowerCase().replace(/\s+/g, '')}${lastName.toLowerCase().replace(/\s+/g, '')}`
+                            : prev.linkedinProfileUrl;
+                          return {
+                            ...prev,
+                            lastName,
+                            linkedinProfileUrl: linkedinUrl
+                          };
+                        });
+                      }}
                       placeholder="Enter your last name"
                       autoComplete="family-name"
                     />

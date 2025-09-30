@@ -16,6 +16,7 @@ const STORAGE_KEYS = {
   FILE_UPLOAD_HISTORY: 'connectorpro_file_upload_history',
   PRIMARY_GOAL: 'connectorpro_primary_goal',
   TARGET_COMPANIES: 'connectorpro_target_companies',
+  NETWORKING_GOALS: 'connectorpro_networking_goals',
   LINKEDIN_PROFILE_URL: 'connectorpro_linkedin_profile_url',
   LINKEDIN_CONNECTED: 'connectorpro_linkedin_connected',
   EMAIL_CONNECTED: 'connectorpro_email_connected',
@@ -285,9 +286,21 @@ export const storage = {
       }
     }
 
+    let networkingGoals = [];
+    const networkingGoalsData = localStorage.getItem(STORAGE_KEYS.NETWORKING_GOALS);
+    if (networkingGoalsData) {
+      try {
+        networkingGoals = JSON.parse(networkingGoalsData);
+      } catch (error) {
+        console.error('Error parsing networking goals:', error);
+        networkingGoals = [];
+      }
+    }
+
     return {
       primaryGoal: localStorage.getItem(STORAGE_KEYS.PRIMARY_GOAL),
       targetCompanies,
+      networkingGoals,
       linkedinProfileUrl: localStorage.getItem(STORAGE_KEYS.LINKEDIN_PROFILE_URL),
       linkedinConnected: localStorage.getItem(STORAGE_KEYS.LINKEDIN_CONNECTED) === 'true',
       emailConnected: localStorage.getItem(STORAGE_KEYS.EMAIL_CONNECTED) === 'true',
@@ -301,6 +314,7 @@ export const storage = {
   setOnboardingData: (data: any, emailProvider: string) => {
     localStorage.setItem(STORAGE_KEYS.PRIMARY_GOAL, data.primaryGoal);
     localStorage.setItem(STORAGE_KEYS.TARGET_COMPANIES, JSON.stringify(data.targetCompanies));
+    localStorage.setItem(STORAGE_KEYS.NETWORKING_GOALS, JSON.stringify(data.networkingGoals || []));
     localStorage.setItem(STORAGE_KEYS.LINKEDIN_PROFILE_URL, data.linkedinProfileUrl);
     localStorage.setItem(STORAGE_KEYS.LINKEDIN_CONNECTED, data.linkedinConnected.toString());
     localStorage.setItem(STORAGE_KEYS.CSV_UPLOADED, data.csvUploaded.toString());

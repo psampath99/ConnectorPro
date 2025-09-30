@@ -6,7 +6,6 @@ import { Network, Eye, EyeOff } from 'lucide-react';
 import { User } from '@/types';
 import { storage } from '@/lib/storage';
 import { Step1_UserProfile, Step1UserProfileData } from './Step1_UserProfile';
-import { Step2_Integrations } from './Step2_Integrations';
 import { Step3_FinalSteps } from './Step3_FinalSteps';
 
 interface UnifiedOnboardingData {
@@ -35,6 +34,156 @@ interface UnifiedOnboardingData {
 interface OnboardingFlowProps {
   onComplete: (userData: User) => void;
 }
+
+// MOVED OUTSIDE to prevent re-rendering issues that cause focus loss
+const PasswordCreationStep = ({
+  data,
+  password,
+  setPassword,
+  confirmPassword,
+  setConfirmPassword,
+  showPassword,
+  setShowPassword,
+  showConfirmPassword,
+  setShowConfirmPassword,
+  passwordError,
+  handlePasswordCreation,
+  setCurrentStep,
+}: {
+  data: UnifiedOnboardingData;
+  password: string;
+  setPassword: (value: string) => void;
+  confirmPassword: string;
+  setConfirmPassword: (value: string) => void;
+  showPassword: boolean;
+  setShowPassword: (value: boolean) => void;
+  showConfirmPassword: boolean;
+  setShowConfirmPassword: (value: boolean) => void;
+  passwordError: string;
+  handlePasswordCreation: () => void;
+  setCurrentStep: (step: number) => void;
+}) => (
+  <div className="space-y-6">
+    <div className="text-center">
+      <h3 className="text-lg font-semibold mb-2">Create Your Password</h3>
+      <p className="text-gray-600">Set a secure password for your ConnectorPro account</p>
+      <p className="text-sm text-gray-500 mt-2">
+        Your email: <span className="font-medium">{data.email}</span>
+      </p>
+    </div>
+
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Password
+        </label>
+        <div className="relative">
+          <Input
+            type={showPassword ? 'text' : 'password'}
+            value={password}
+            onChange={(e) => {
+              console.log('🔍 Password input onChange:', e.target.value);
+              setPassword(e.target.value);
+            }}
+            onFocus={() => console.log('🔍 Password input focused')}
+            onBlur={() => console.log('🔍 Password input blurred')}
+            placeholder="Enter your password"
+            className="pr-12"
+            autoComplete="new-password"
+          />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('🔍 Password toggle clicked');
+              setShowPassword(!showPassword);
+            }}
+            className="absolute inset-y-0 right-0 pr-3 flex items-center hover:bg-gray-50 rounded-r-md"
+            style={{ width: '40px' }}
+            tabIndex={-1}
+          >
+            {showPassword ? (
+              <EyeOff className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+            ) : (
+              <Eye className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+            )}
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 mt-1">
+          Password must be at least 8 characters long
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Confirm Password
+        </label>
+        <div className="relative">
+          <Input
+            type={showConfirmPassword ? 'text' : 'password'}
+            value={confirmPassword}
+            onChange={(e) => {
+              console.log('🔍 Confirm password input onChange:', e.target.value);
+              setConfirmPassword(e.target.value);
+            }}
+            onFocus={() => console.log('🔍 Confirm password input focused')}
+            onBlur={() => console.log('🔍 Confirm password input blurred')}
+            placeholder="Confirm your password"
+            className="pr-12"
+            autoComplete="new-password"
+          />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('🔍 Confirm password toggle clicked');
+              setShowConfirmPassword(!showConfirmPassword);
+            }}
+            className="absolute inset-y-0 right-0 pr-3 flex items-center hover:bg-gray-50 rounded-r-md"
+            style={{ width: '40px' }}
+            tabIndex={-1}
+          >
+            {showConfirmPassword ? (
+              <EyeOff className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+            ) : (
+              <Eye className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {passwordError && (
+        <div className="text-red-600 text-sm bg-red-50 p-2 rounded border border-red-200">
+          {passwordError}
+        </div>
+      )}
+    </div>
+
+    <div className="bg-green-50 rounded-lg p-4">
+      <h4 className="font-medium text-green-900 mb-2">Almost done! 🎉</h4>
+      <p className="text-sm text-green-800">
+        After creating your password, you'll be taken to your settings page where you can
+        complete your profile and set up your integrations (LinkedIn, Gmail, Calendar).
+      </p>
+    </div>
+
+    {/* Navigation Buttons */}
+    <div className="flex justify-between pt-6 border-t">
+      <Button variant="outline" onClick={() => setCurrentStep(2)}>
+        Back
+      </Button>
+      <Button
+        onClick={handlePasswordCreation}
+        disabled={!password || !confirmPassword}
+        className="bg-green-600 hover:bg-green-700"
+      >
+        Create Account
+      </Button>
+    </div>
+  </div>
+);
 
 export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   const [currentStep, setCurrentStep] = useState(1);
@@ -85,26 +234,16 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       targetCompanies: step1Data.targetCompanies
     }));
     
-    setCurrentStep(2); // Move to Integrations
+    setCurrentStep(2); // Move to Final Steps (previously step 3)
   };
 
   const handleStep2Complete = () => {
-    console.log('Step 2 (Integrations) completed');
-    // We can pass data from Step2 if needed, but for now, just advance the step
-    setCurrentStep(3); // Move to Final Steps
+    console.log('Step 2 (Final Steps) completed, moving to password creation');
+    setCurrentStep(3);
   };
 
   const handleStep2Back = () => {
     setCurrentStep(1);
-  };
-
-  const handleStep3Complete = () => {
-    console.log('Step 3 (Final Steps) completed, moving to password creation');
-    setCurrentStep(4);
-  };
-
-  const handleStep3Back = () => {
-    setCurrentStep(2);
   };
 
   const validatePassword = () => {
@@ -120,164 +259,106 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     return true;
   };
 
-  const handlePasswordCreation = () => {
+  const handlePasswordCreation = async () => {
     if (!validatePassword()) {
       return;
     }
 
-    console.log('Password creation completed, creating account...');
+    console.log('🔍 [DEBUG] Password creation started');
+    console.log('🔍 [DEBUG] Email:', data.email);
+    console.log('🔍 [DEBUG] Password length:', password.length);
     
-    // Create user object from collected data
-    const user: User = {
-      id: `user-${Date.now()}`,
-      email: data.email,
-      name: `${data.firstName} ${data.lastName}`.trim(),
-      role: data.persona as User['role'],
-      createdAt: new Date(),
-      preferences: {
-        commonalityOrder: data.commonalityOrder,
-        draftTone: data.draftTone,
-        reminderFrequency: 7
+    try {
+      // First, register the user with the backend
+      console.log('🔍 [DEBUG] Attempting to register user with backend...');
+      
+      const registerResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: `${data.firstName} ${data.lastName}`.trim(),
+          email: data.email,
+          password: password
+        }),
+      });
+
+      if (!registerResponse.ok) {
+        const errorData = await registerResponse.json().catch(() => ({}));
+        console.error('🔍 [DEBUG] Backend registration failed:', errorData);
+        throw new Error(errorData.detail || 'Registration failed');
       }
-    };
 
-    // Store user data and onboarding data using centralized storage
-    storage.setUser(user);
-    
-    // Store onboarding data in the format expected by the existing system
-    const onboardingDataForStorage = {
-      persona: data.persona,
-      name: `${data.firstName} ${data.lastName}`.trim(),
-      email: data.email,
-      linkedinProfileUrl: data.linkedinProfileUrl,
-      primaryGoal: data.networkingGoals[0] || '', // Use first goal as primary
-      networkingGoals: data.networkingGoals,
-      targetCompanies: data.targetCompanies,
-      linkedinConnected: data.linkedinConnected,
-      emailConnected: data.emailConnected,
-      calendarConnected: data.calendarConnected,
-      csvUploaded: data.csvUploaded,
-      csvImportResult: data.csvImportResult,
-      uploadedFiles: data.uploadedFiles,
-      draftTone: data.draftTone,
-      commonalityOrder: data.commonalityOrder
-    };
-    
-    storage.setOnboardingData(onboardingDataForStorage, 'gmail'); // Default email provider
-    console.log('✅ Onboarding data saved to localStorage');
-    
-    // Navigate to settings page after account creation
-    window.location.href = '/settings';
-    
-    onComplete(user);
+      const registerData = await registerResponse.json();
+      console.log('🔍 [DEBUG] Backend registration successful:', registerData);
+
+      // Create user object from collected data
+      const user: User = {
+        id: registerData.user?.id || `user-${Date.now()}`,
+        email: data.email,
+        name: `${data.firstName} ${data.lastName}`.trim(),
+        role: data.persona as User['role'],
+        createdAt: new Date(),
+        preferences: {
+          commonalityOrder: data.commonalityOrder,
+          draftTone: data.draftTone,
+          reminderFrequency: 7
+        }
+      };
+
+      // Store user data and onboarding data using centralized storage
+      storage.setUser(user);
+      
+      // Store authentication token if provided
+      if (registerData.access_token) {
+        localStorage.setItem('connectorpro_token', registerData.access_token);
+        localStorage.setItem('connectorpro_user', JSON.stringify(registerData.user));
+        if (registerData.expires_in) {
+          const expiryTime = new Date().getTime() + (registerData.expires_in * 1000);
+          localStorage.setItem('connectorpro_token_expiry', expiryTime.toString());
+        }
+        console.log('🔍 [DEBUG] Authentication tokens stored');
+      }
+      
+      // Store onboarding data in the format expected by the existing system
+      const onboardingDataForStorage = {
+        persona: data.persona,
+        name: `${data.firstName} ${data.lastName}`.trim(),
+        email: data.email,
+        linkedinProfileUrl: data.linkedinProfileUrl,
+        primaryGoal: data.networkingGoals[0] || '', // Use first goal as primary
+        networkingGoals: data.networkingGoals,
+        targetCompanies: data.targetCompanies,
+        linkedinConnected: data.linkedinConnected,
+        emailConnected: data.emailConnected,
+        calendarConnected: data.calendarConnected,
+        csvUploaded: data.csvUploaded,
+        csvImportResult: data.csvImportResult,
+        uploadedFiles: data.uploadedFiles,
+        draftTone: data.draftTone,
+        commonalityOrder: data.commonalityOrder
+      };
+      
+      storage.setOnboardingData(onboardingDataForStorage, 'gmail'); // Default email provider
+      console.log('🔍 [DEBUG] ✅ User registered with backend and onboarding data saved');
+      
+      // Navigate to settings page after account creation
+      window.location.href = '/settings';
+      
+      onComplete(user);
+      
+    } catch (error) {
+      console.error('🔍 [DEBUG] ❌ Registration error:', error);
+      setPasswordError(`Registration failed: ${error.message}`);
+    }
   };
-
-  const PasswordCreationStep = () => (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h3 className="text-lg font-semibold mb-2">Create Your Password</h3>
-        <p className="text-gray-600">Set a secure password for your ConnectorPro account</p>
-        <p className="text-sm text-gray-500 mt-2">
-          Your email: <span className="font-medium">{data.email}</span>
-        </p>
-      </div>
-
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Password
-          </label>
-          <div className="relative">
-            <Input
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              className="pr-12"
-              autoComplete="new-password"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center hover:bg-gray-50 rounded-r-md z-10"
-              tabIndex={-1}
-            >
-              {showPassword ? (
-                <EyeOff className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-              ) : (
-                <Eye className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-              )}
-            </button>
-          </div>
-          <p className="text-xs text-gray-500 mt-1">
-            Password must be at least 8 characters long
-          </p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Confirm Password
-          </label>
-          <div className="relative">
-            <Input
-              type={showConfirmPassword ? 'text' : 'password'}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm your password"
-              className="pr-12"
-              autoComplete="new-password"
-            />
-            <button
-              type="button"
-              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center hover:bg-gray-50 rounded-r-md z-10"
-              tabIndex={-1}
-            >
-              {showConfirmPassword ? (
-                <EyeOff className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-              ) : (
-                <Eye className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-              )}
-            </button>
-          </div>
-        </div>
-
-        {passwordError && (
-          <div className="text-red-600 text-sm bg-red-50 p-2 rounded border border-red-200">
-            {passwordError}
-          </div>
-        )}
-      </div>
-
-      <div className="bg-green-50 rounded-lg p-4">
-        <h4 className="font-medium text-green-900 mb-2">Almost done! 🎉</h4>
-        <p className="text-sm text-green-800">
-          After creating your password, you'll be taken to your settings page where you can 
-          complete your profile and set up your integrations (LinkedIn, Gmail, Calendar).
-        </p>
-      </div>
-
-      {/* Navigation Buttons */}
-      <div className="flex justify-between pt-6 border-t">
-        <Button variant="outline" onClick={() => setCurrentStep(3)}>
-          Back
-        </Button>
-        <Button
-          onClick={handlePasswordCreation}
-          disabled={!password || !confirmPassword}
-          className="bg-green-600 hover:bg-green-700"
-        >
-          Create Account
-        </Button>
-      </div>
-    </div>
-  );
 
   const renderCurrentStep = () => {
     switch (currentStep) {
       case 1:
         return (
-          <Step1_UserProfile 
+          <Step1_UserProfile
             onComplete={handleStep1Complete}
             onCancel={() => {
               // Handle cancel if needed
@@ -287,20 +368,28 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
         );
       case 2:
         return (
-          <Step2_Integrations
-            onNext={handleStep2Complete}
+          <Step3_FinalSteps
+            onComplete={handleStep2Complete}
             onBack={handleStep2Back}
           />
         );
       case 3:
         return (
-          <Step3_FinalSteps
-            onComplete={handleStep3Complete}
-            onBack={handleStep3Back}
+          <PasswordCreationStep
+            data={data}
+            password={password}
+            setPassword={setPassword}
+            confirmPassword={confirmPassword}
+            setConfirmPassword={setConfirmPassword}
+            showPassword={showPassword}
+            setShowPassword={setShowPassword}
+            showConfirmPassword={showConfirmPassword}
+            setShowConfirmPassword={setShowConfirmPassword}
+            passwordError={passwordError}
+            handlePasswordCreation={handlePasswordCreation}
+            setCurrentStep={setCurrentStep}
           />
         );
-      case 4:
-        return <PasswordCreationStep />;
       default:
         return null;
     }
