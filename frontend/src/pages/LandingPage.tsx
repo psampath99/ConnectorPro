@@ -426,7 +426,7 @@ const LandingPage: React.FC = () => {
         break;
         
       default:
-        // Fallback to new user flow
+        // Fallback to new user flow - always show onboarding for truly new users
         console.log('Unknown user state - defaulting to new user flow');
         setShowOnboarding(true);
     }
@@ -439,40 +439,17 @@ const LandingPage: React.FC = () => {
   const handleDemoAccount = async () => {
     setIsLoading(true);
     try {
-      console.log('🔍 [DEBUG] Demo account setup started - direct navigation approach');
+      console.log('🔍 [DEBUG] Demo account setup started - using loginAsDemo');
       
-      // Create comprehensive demo user data using Sampath Prema's account
-      const demoUser = {
-        id: 'demo-user-sampath',
-        email: 'sampath.prema@gmail.com',
-        name: 'Sampath Prema',
-        role: 'job_seeker',
-        preferences: {
-          draftTone: 'professional',
-          reminderFrequency: 7,
-          commonalityOrder: ['employer', 'education', 'mutual', 'event']
-        }
-      };
+      // Use the AuthContext loginAsDemo method which properly sets up state
+      const result = await loginAsDemo();
       
-      // Set demo mode flags FIRST
-      localStorage.setItem('connectorpro_demo_mode', 'true');
-      localStorage.setItem('connectorpro_onboarding_complete', 'true');
-      localStorage.setItem('connectorpro_user', JSON.stringify(demoUser));
-      localStorage.setItem('connectorpro_token', 'demo-token-' + Date.now());
-      
-      // Set demo target companies
-      const demoTargetCompanies = ['Google', 'Meta', 'Apple', 'Microsoft', 'Amazon'];
-      localStorage.setItem('connectorpro_target_companies', JSON.stringify(demoTargetCompanies));
-      
-      console.log('🔍 [DEBUG] Demo data stored, navigating directly to /demo');
-      
-      toast({
-        title: "Welcome to Demo Mode!",
-        description: "You're now exploring ConnectorPro with Sampath Prema's demo account.",
-      });
-      
-      // Navigate directly to demo route
-      navigate('/demo', { replace: true });
+      if (result.success) {
+        console.log('🔍 [DEBUG] Demo login successful, navigating to AI Assistant');
+        // Navigation is handled by the AuthContext
+      } else {
+        throw new Error('Demo login failed');
+      }
       
     } catch (error: any) {
       console.error('🔍 [DEBUG] Demo setup error:', error);

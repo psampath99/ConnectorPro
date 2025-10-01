@@ -21,6 +21,8 @@ from gmail_service import GmailService
 from calendar_service import CalendarService
 from csv_service import CSVService
 from llm_service import NetworkQueryLLMService, llm_service
+from rag_service import NetworkRAGService, rag_service
+from models import NetworkQueryRequest, NetworkQueryResponse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -32,6 +34,7 @@ gmail_service = None
 calendar_service = None
 csv_service = None
 llm_service = None
+rag_service = None
 
 # Simple in-memory storage for demo purposes (simulating localStorage)
 localStorage_simulation = {
@@ -64,7 +67,7 @@ localStorage_simulation = {
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
-    global db_service, enhanced_auth_service, gmail_service, calendar_service, csv_service, llm_service
+    global db_service, enhanced_auth_service, gmail_service, calendar_service, csv_service, llm_service, rag_service
     
     try:
         # Initialize database connection
@@ -119,6 +122,11 @@ async def lifespan(app: FastAPI):
         logger.info("🤖 Initializing LLM service...")
         # LLM service is already initialized as a global instance
         logger.info("✅ LLM service initialized")
+        
+        logger.info("🧠 Initializing RAG service...")
+        from rag_service import NetworkRAGService
+        rag_service = NetworkRAGService(db_service)
+        logger.info("✅ RAG service initialized")
         
         logger.info("🎉 All services initialized successfully!")
         
@@ -260,6 +268,13 @@ async def register(
         
     except HTTPException:
         raise
+    except ValueError as e:
+        # Handle validation errors from Pydantic models
+        logger.warning(f"❌ Registration validation error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(e)
+        )
     except Exception as e:
         logger.error(f"❌ Registration error: {e}")
         raise HTTPException(
@@ -439,6 +454,160 @@ async def disconnect_gmail(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to disconnect Gmail: {str(e)}"
+        )
+
+@app.post("/api/v1/gmail/send")
+async def send_gmail_email(
+    request: dict,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Send email via Gmail"""
+    try:
+        # Handle demo users or unauthenticated requests
+        if not current_user:
+            logger.info("📧 Gmail send email request for demo/unauthenticated user")
+            user_id = "demo-user-sampath"
+            user_email = "sampath.prema@gmail.com"
+        else:
+            logger.info(f"📧 Gmail send email request for user: {current_user.email}")
+            user_id = current_user.id
+            user_email = current_user.email
+        
+        # Extract email data from request
+        to = request.get("to")
+        subject = request.get("subject", "")
+        body = request.get("body", "")
+        body_type = request.get("body_type", "plain")
+        cc = request.get("cc")
+        bcc = request.get("bcc")
+        
+        if not to:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Recipient email address is required"
+            )
+        
+        # Check Gmail connection status
+        gmail_connected_key = f"gmail_connected_{user_id}"
+        gmail_connection_data = localStorage_simulation.get(gmail_connected_key)
+        
+        if not gmail_connection_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Gmail not connected. Please connect your Gmail account first."
+            )
+        
+        # For demo purposes, simulate sending email
+        # In a real implementation, you would:
+        # 1. Get the Gmail connection from database
+        # 2. Use gmail_service.send_email() with proper credentials
+        
+        logger.info(f"📧 Simulating email send from {user_email} to {to}")
+        logger.info(f"📧 Subject: {subject}")
+        logger.info(f"📧 Body preview: {body[:100]}...")
+        
+        # Simulate successful send
+        import uuid
+        message_id = str(uuid.uuid4())
+        
+        return {
+            "success": True,
+            "message": "Email sent successfully",
+            "message_id": message_id,
+            "to": to,
+            "subject": subject,
+            "sent_at": datetime.now().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Gmail send email error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send email: {str(e)}"
+        )
+
+@app.post("/api/v1/calendar/create-event")
+async def create_calendar_event(
+    request: dict,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Create a calendar event"""
+    try:
+        # Handle demo users or unauthenticated requests
+        if not current_user:
+            logger.info("📅 Calendar create event request for demo/unauthenticated user")
+            user_id = "demo-user-sampath"
+            user_email = "sampath.prema@gmail.com"
+        else:
+            logger.info(f"📅 Calendar create event request for user: {current_user.email}")
+            user_id = current_user.id
+            user_email = current_user.email
+        
+        # Extract event data from request
+        summary = request.get("summary")
+        description = request.get("description", "")
+        start_time = request.get("start_time")
+        end_time = request.get("end_time")
+        attendees = request.get("attendees", [])
+        location = request.get("location", "")
+        
+        if not summary:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Event summary is required"
+            )
+        
+        if not start_time or not end_time:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Start time and end time are required"
+            )
+        
+        # Check Calendar connection status
+        calendar_connected_key = f"calendar_connected_{user_id}"
+        calendar_connection_data = localStorage_simulation.get(calendar_connected_key)
+        
+        if not calendar_connection_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Calendar not connected. Please connect your Google Calendar first."
+            )
+        
+        # For demo purposes, simulate creating calendar event
+        # In a real implementation, you would:
+        # 1. Get the Calendar connection from database
+        # 2. Use calendar_service.create_event() with proper credentials
+        
+        logger.info(f"📅 Simulating calendar event creation for {user_email}")
+        logger.info(f"📅 Event: {summary}")
+        logger.info(f"📅 Start: {start_time}, End: {end_time}")
+        logger.info(f"📅 Attendees: {attendees}")
+        
+        # Simulate successful creation
+        import uuid
+        event_id = str(uuid.uuid4())
+        
+        return {
+            "success": True,
+            "message": "Calendar event created successfully",
+            "event_id": event_id,
+            "summary": summary,
+            "start_time": start_time,
+            "end_time": end_time,
+            "attendees": attendees,
+            "location": location,
+            "created_at": datetime.now().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Calendar create event error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create calendar event: {str(e)}"
         )
 
 @app.get("/api/v1/calendar/status")
@@ -721,16 +890,34 @@ async def import_csv(
         valid_contacts, validation_errors = csv_service.validate_contacts(contacts)
         all_errors = errors + validation_errors
         
-        # For demo purposes, we'll just return the results without saving to database
-        # In a real implementation, you would save to the database here
+        # Save contacts to database
+        saved_contacts = []
+        if valid_contacts and db_service:
+            try:
+                # Add user_id to each contact
+                for contact in valid_contacts:
+                    contact.id = None  # Let MongoDB generate the ID
+                    # Add user_id field to contact dict before saving
+                    contact_dict = contact.dict()
+                    contact_dict['user_id'] = user_id
+                    
+                    # Create contact in database
+                    doc_result = await db_service.contacts_collection.insert_one(contact_dict)
+                    contact.id = str(doc_result.inserted_id)
+                    saved_contacts.append(contact)
+                
+                logger.info(f"✅ Saved {len(saved_contacts)} contacts to database for user: {user_email}")
+            except Exception as db_error:
+                logger.error(f"❌ Database save error: {db_error}")
+                all_errors.append(f"Database save error: {str(db_error)}")
         
-        logger.info(f"✅ CSV import completed for user: {user_email} - {len(valid_contacts)} contacts imported")
+        logger.info(f"✅ CSV import completed for user: {user_email} - {len(saved_contacts)} contacts imported")
         
         return {
             "success": True,
-            "imported": len(valid_contacts),
+            "imported": len(saved_contacts),
             "total": total_rows,
-            "contacts": [contact.dict() for contact in valid_contacts],
+            "contacts": [contact.dict() for contact in saved_contacts],
             "errors": all_errors[:50],  # Limit errors to first 50
             "uploadId": f"upload-{user_id}-{int(datetime.now().timestamp())}",
             "uploadedAt": datetime.now().isoformat(),
@@ -786,26 +973,48 @@ async def get_contacts_stats(
         # Handle demo users or unauthenticated requests
         if not current_user:
             logger.info("📊 Get contacts stats request for demo/unauthenticated user")
+            user_id = "demo-user-sampath"
             user_email = "sampath.prema@gmail.com"
         else:
             logger.info(f"📊 Get contacts stats request for user: {current_user.email}")
+            user_id = current_user.id
             user_email = current_user.email
         
-        # For demo purposes, return basic stats
-        return {
-            "total": 0,
-            "byDegree": {
-                "first": 0,
-                "second": 0,
-                "third": 0
-            },
-            "byStrength": {
-                "strong": 0,
-                "medium": 0,
-                "weak": 0
-            },
-            "recentlyAdded": 0
-        }
+        # Use RAG service to get actual stats
+        if rag_service and rag_service.data_retriever:
+            stats = await rag_service.data_retriever._get_contact_stats(user_id, {})
+            return {
+                "totalActiveContacts": stats.get("totalActiveContacts", 0),
+                "total": stats.get("totalActiveContacts", 0),
+                "byDegree": {
+                    "first": stats.get("totalActiveContacts", 0),
+                    "second": 0,
+                    "third": 0
+                },
+                "byStrength": {
+                    "strong": 0,
+                    "medium": stats.get("totalActiveContacts", 0),
+                    "weak": 0
+                },
+                "recentlyAdded": 0
+            }
+        else:
+            # Fallback to empty stats
+            return {
+                "totalActiveContacts": 0,
+                "total": 0,
+                "byDegree": {
+                    "first": 0,
+                    "second": 0,
+                    "third": 0
+                },
+                "byStrength": {
+                    "strong": 0,
+                    "medium": 0,
+                    "weak": 0
+                },
+                "recentlyAdded": 0
+            }
         
     except Exception as e:
         logger.error(f"❌ Get contacts stats error: {e}")
@@ -824,17 +1033,44 @@ async def get_contacts_grouped_by_company(
         # Handle demo users or unauthenticated requests
         if not current_user:
             logger.info("🏢 Get contacts grouped by company request for demo/unauthenticated user")
+            user_id = "demo-user-sampath"
             user_email = "sampath.prema@gmail.com"
         else:
             logger.info(f"🏢 Get contacts grouped by company request for user: {current_user.email}")
+            user_id = current_user.id
             user_email = current_user.email
         
-        # For demo purposes, return empty list
-        return {
-            "companies": [],
-            "total": 0,
-            "require_title": require_title
-        }
+        # Use RAG service to get actual data
+        if rag_service and rag_service.data_retriever:
+            params = {"require_title": require_title}
+            result = await rag_service.data_retriever._get_contacts_grouped_by_company(user_id, params)
+            
+            if result.get("success"):
+                return {
+                    "success": True,
+                    "companies": result.get("companies", {}),
+                    "companies_with_contacts": result.get("companies_with_contacts", 0),
+                    "total": result.get("total_contacts", 0),
+                    "require_title": require_title
+                }
+            else:
+                return {
+                    "success": False,
+                    "companies": {},
+                    "companies_with_contacts": 0,
+                    "total": 0,
+                    "require_title": require_title,
+                    "error": result.get("error", "Unknown error")
+                }
+        else:
+            # Fallback to empty list
+            return {
+                "success": True,
+                "companies": {},
+                "companies_with_contacts": 0,
+                "total": 0,
+                "require_title": require_title
+            }
         
     except Exception as e:
         logger.error(f"❌ Get contacts grouped by company error: {e}")
@@ -852,22 +1088,193 @@ async def get_target_companies(
         # Handle demo users or unauthenticated requests
         if not current_user:
             logger.info("🏢 Get target companies request for demo/unauthenticated user")
+            user_id = "demo-user-sampath"
             user_email = "sampath.prema@gmail.com"
         else:
             logger.info(f"🏢 Get target companies request for user: {current_user.email}")
+            user_id = current_user.id
             user_email = current_user.email
         
-        # For demo purposes, return empty list
-        return {
-            "companies": [],
-            "total": 0
-        }
+        # Use RAG service to get actual data
+        if rag_service and rag_service.data_retriever:
+            result = await rag_service.data_retriever._get_target_companies(user_id, {})
+            
+            if result.get("success"):
+                companies = result.get("companies", [])
+                return {
+                    "success": True,
+                    "companies": companies,
+                    "total": len(companies)
+                }
+            else:
+                return {
+                    "success": False,
+                    "companies": [],
+                    "total": 0,
+                    "error": result.get("error", "Unknown error")
+                }
+        else:
+            # Fallback to empty list
+            return {
+                "success": True,
+                "companies": [],
+                "total": 0
+            }
         
     except Exception as e:
         logger.error(f"❌ Get target companies error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get target companies: {str(e)}"
+        )
+
+@app.post("/api/v1/target-companies")
+async def add_target_company(
+    request: dict,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Add a target company"""
+    try:
+        # Handle demo users or unauthenticated requests
+        if not current_user:
+            logger.info("🏢 Add target company request for demo/unauthenticated user")
+            user_id = "demo-user-sampath"
+            user_email = "sampath.prema@gmail.com"
+        else:
+            logger.info(f"🏢 Add target company request for user: {current_user.email}")
+            user_id = current_user.id
+            user_email = current_user.email
+        
+        company_name = request.get("company_name")
+        company_domains = request.get("company_domains", [])
+        
+        if not company_name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="company_name is required"
+            )
+        
+        # Create target company using database service
+        if db_service:
+            from models import UserTargetCompany
+            from datetime import datetime
+            
+            target_company = UserTargetCompany(
+                user_id=user_id,
+                company_name=company_name,
+                company_domains=company_domains,
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+            
+            saved_company = await db_service.create_target_company(target_company)
+            
+            logger.info(f"✅ Target company '{company_name}' added for user: {user_email}")
+            
+            return {
+                "success": True,
+                "message": f"Target company '{company_name}' added successfully",
+                "company": {
+                    "id": saved_company.id,
+                    "company_name": saved_company.company_name,
+                    "company_domains": saved_company.company_domains,
+                    "created_at": saved_company.created_at.isoformat() if saved_company.created_at else None
+                }
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database service not available"
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Add target company error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to add target company: {str(e)}"
+        )
+
+@app.post("/api/v1/target-companies/bulk")
+async def add_target_companies_bulk(
+    request: dict,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Add multiple target companies"""
+    try:
+        # Handle demo users or unauthenticated requests
+        if not current_user:
+            logger.info("🏢 Bulk add target companies request for demo/unauthenticated user")
+            user_id = "demo-user-sampath"
+            user_email = "sampath.prema@gmail.com"
+        else:
+            logger.info(f"🏢 Bulk add target companies request for user: {current_user.email}")
+            user_id = current_user.id
+            user_email = current_user.email
+        
+        companies = request.get("companies", [])
+        
+        if not companies:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="companies array is required"
+            )
+        
+        # Create target companies using database service
+        saved_companies = []
+        if db_service:
+            from models import UserTargetCompany
+            from datetime import datetime
+            
+            for company_data in companies:
+                company_name = company_data.get("company_name") or company_data.get("name")
+                company_domains = company_data.get("company_domains", [])
+                
+                if not company_name:
+                    continue  # Skip invalid entries
+                
+                target_company = UserTargetCompany(
+                    user_id=user_id,
+                    company_name=company_name,
+                    company_domains=company_domains,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now()
+                )
+                
+                try:
+                    saved_company = await db_service.create_target_company(target_company)
+                    saved_companies.append({
+                        "id": saved_company.id,
+                        "company_name": saved_company.company_name,
+                        "company_domains": saved_company.company_domains,
+                        "created_at": saved_company.created_at.isoformat() if saved_company.created_at else None
+                    })
+                except Exception as e:
+                    logger.warning(f"Failed to save company '{company_name}': {e}")
+                    continue
+            
+            logger.info(f"✅ {len(saved_companies)} target companies added for user: {user_email}")
+            
+            return {
+                "success": True,
+                "message": f"{len(saved_companies)} target companies added successfully",
+                "companies": saved_companies,
+                "total": len(saved_companies)
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database service not available"
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Bulk add target companies error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to add target companies: {str(e)}"
         )
 
 @app.get("/api/v1/file-uploads/")
@@ -898,6 +1305,115 @@ async def get_file_uploads(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get file uploads: {str(e)}"
         )
+
+# Network Query endpoint for AI Assistant
+@app.post("/api/v1/network/query", response_model=NetworkQueryResponse)
+async def process_network_query(
+    request: NetworkQueryRequest,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Process natural language queries about the user's network using RAG"""
+    try:
+        # Handle demo users or unauthenticated requests
+        if not current_user:
+            logger.info("🧠 Network query request for demo/unauthenticated user")
+            user_id = "demo-user-sampath"
+            user_email = "sampath.prema@gmail.com"
+        else:
+            logger.info(f"🧠 Network query request for user: {current_user.email}")
+            user_id = current_user.id
+            user_email = current_user.email
+        
+        logger.info(f"🧠 Processing query: {request.query}")
+        
+        # Check if RAG service is available
+        if not rag_service:
+            logger.error("❌ RAG service not initialized")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="RAG service not available"
+            )
+        
+        # Process the query using RAG service
+        response = await rag_service.process_network_query(request, user_id)
+        
+        logger.info(f"✅ Network query processed successfully for user: {user_email}")
+        logger.info(f"🧠 Query type: {response.query_type}, Confidence: {response.confidence}")
+        
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Network query error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to process network query: {str(e)}"
+        )
+
+@app.post("/api/v1/admin/fix-user-ids")
+async def fix_user_ids():
+    """Fix user IDs - move all non-demo contacts to demo user"""
+    try:
+        if not db_service:
+            raise HTTPException(status_code=503, detail="Database not available")
+        
+        # Count total contacts
+        total_count = await db_service.contacts_collection.count_documents({})
+        logger.info(f"Total contacts in database: {total_count}")
+        
+        # Count current demo contacts
+        demo_count = await db_service.contacts_collection.count_documents({'user_id': 'demo-user-sampath'})
+        logger.info(f"Current demo contacts: {demo_count}")
+        
+        # Count contacts without user_id field
+        no_user_id_count = await db_service.contacts_collection.count_documents({'user_id': {'$exists': False}})
+        logger.info(f"Contacts without user_id field: {no_user_id_count}")
+        
+        # Get a sample contact to see its structure
+        sample = await db_service.contacts_collection.find_one({})
+        logger.info(f"Sample contact fields: {list(sample.keys()) if sample else 'No contacts found'}")
+        
+        # Find contacts that are not demo user (including those without user_id)
+        non_demo_query = {
+            '$or': [
+                {'user_id': {'$ne': 'demo-user-sampath'}},
+                {'user_id': {'$exists': False}}
+            ]
+        }
+        non_demo_count = await db_service.contacts_collection.count_documents(non_demo_query)
+        logger.info(f"Non-demo contacts to update: {non_demo_count}")
+        
+        if non_demo_count > 0:
+            # Update all non-demo contacts to use demo-user-sampath
+            result = await db_service.contacts_collection.update_many(
+                non_demo_query,
+                {'$set': {'user_id': 'demo-user-sampath'}}
+            )
+            
+            new_demo_count = await db_service.contacts_collection.count_documents({'user_id': 'demo-user-sampath'})
+            
+            return {
+                "success": True,
+                "message": f"Updated {result.modified_count} contacts",
+                "total_contacts": total_count,
+                "old_demo_count": demo_count,
+                "new_demo_count": new_demo_count,
+                "contacts_updated": result.modified_count
+            }
+        else:
+            return {
+                "success": True,
+                "message": "No non-demo contacts found to update",
+                "total_contacts": total_count,
+                "demo_count": demo_count
+            }
+            
+    except Exception as e:
+        logger.error(f"Fix user IDs error: {e}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Run the application
 if __name__ == "__main__":

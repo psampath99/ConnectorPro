@@ -114,19 +114,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // For returning users (successful login), mark onboarding as complete
       // This ensures they go directly to dashboard instead of onboarding
-      const onboardingData = storage.getOnboardingData();
-      const isNewUser = !onboardingData.onboardingComplete;
-      
-      // If user successfully logs in, treat them as a returning user
-      // and mark onboarding as complete so they skip onboarding flow
-      if (!onboardingData.onboardingComplete) {
-        localStorage.setItem('connectorpro_onboarding_complete', 'true');
-      }
+      localStorage.setItem('connectorpro_onboarding_complete', 'true');
       
       toast({
         title: "Welcome back!",
         description: `Successfully logged in as ${loggedInUser.name}`,
       });
+      
+      // Navigate return users directly to dashboard
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 100);
       
       // Always treat login users as returning users (not new users)
       return { success: true, isNewUser: false };
@@ -230,10 +228,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         description: "You're now exploring ConnectorPro as a demo user.",
       });
       
-      // Only navigate if we're not already on the demo route
-      if (window.location.pathname !== '/demo') {
-        navigate('/demo', { replace: true });
-      }
+      // Force immediate navigation to AI Assistant for demo users
+      setTimeout(() => {
+        navigate('/ai-assistant', { replace: true });
+      }, 100); // Small delay to ensure state is fully updated
       
       return { success: true, isNewUser: false };
     } catch (error) {

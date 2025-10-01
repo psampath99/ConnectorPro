@@ -23,8 +23,9 @@ class LLMProvider(str, Enum):
 
 class QueryType(str, Enum):
     COMPANY_RANKING = "company_ranking"
-    CONTACT_LIST = "contact_list" 
+    CONTACT_LIST = "contact_list"
     COMPANY_CONTACTS = "company_contacts"
+    INDUSTRY_CONTACTS = "industry_contacts"
     ANALYTICS = "analytics"
     VISUALIZATION = "visualization"
     GENERAL = "general"
@@ -251,6 +252,7 @@ QUERY TYPES:
 - company_ranking: Show top companies by contact count
 - contact_list: List contacts with filtering
 - company_contacts: Show contacts at specific companies
+- industry_contacts: Show contacts in specific industries
 - analytics: Statistical analysis of network data
 - visualization: Create charts or visual representations
 - general: General questions about the network
@@ -358,8 +360,18 @@ Respond with JSON only:"""
         
         query_lower = query.lower()
         
-        # Simple rule-based fallback
-        if "top" in query_lower and ("companies" in query_lower or "company" in query_lower):
+        # Enhanced rule-based fallback for company ranking queries
+        company_ranking_keywords = [
+            ("top" in query_lower and ("companies" in query_lower or "company" in query_lower)),
+            ("most contacts" in query_lower and ("companies" in query_lower or "company" in query_lower)),
+            ("which companies" in query_lower and ("most" in query_lower or "top" in query_lower)),
+            ("companies with" in query_lower and ("most" in query_lower or "contacts" in query_lower)),
+            ("rank" in query_lower and ("companies" in query_lower or "company" in query_lower)),
+            ("best" in query_lower and ("companies" in query_lower or "company" in query_lower)),
+            ("largest" in query_lower and ("companies" in query_lower or "company" in query_lower))
+        ]
+        
+        if any(company_ranking_keywords):
             return LLMResponse(
                 query_type=QueryType.COMPANY_RANKING,
                 api_calls=[{
@@ -371,7 +383,7 @@ Respond with JSON only:"""
                 title="Top Companies by Contact Count",
                 summary="Showing companies with the most contacts in your network",
                 filters={"limit": 10},
-                confidence=0.7,
+                confidence=0.8,
                 reasoning="Fallback rule-based parsing detected company ranking query"
             )
         
@@ -387,15 +399,49 @@ Respond with JSON only:"""
                 query_type=QueryType.COMPANY_CONTACTS,
                 api_calls=[{
                     "endpoint": "/api/v1/contacts/grouped-by-company",
-                    "method": "GET", 
+                    "method": "GET",
                     "params": {"require_title": True}
                 }],
                 visualization_type=VisualizationType.CARDS,
                 title=f"Contacts at {company}" if company else "Company Contacts",
                 summary=f"Showing contacts at {company}" if company else "Showing contacts at specified company",
-                filters={"company": company} if company else {},
+                filters={"company": company} if company and company.strip() else {},
                 confidence=0.6,
                 reasoning="Fallback rule-based parsing detected company contacts query"
+            )
+        
+        # Industry-based queries
+        elif any(keyword in query_lower for keyword in ["industry", "sector", "field"]) and any(keyword in query_lower for keyword in ["contacts", "people", "in"]):
+            # Extract industry name
+            industry = None
+            industry_keywords = ["fintech", "fin-tech", "finance", "technology", "tech", "healthcare", "consulting", "marketing", "sales", "education", "retail", "manufacturing", "real estate", "media", "entertainment", "nonprofit", "government", "automotive", "energy", "telecommunications", "biotech", "pharmaceutical", "legal", "accounting", "insurance", "banking", "investment", "venture capital", "private equity", "startup", "saas", "software", "hardware", "ai", "artificial intelligence", "machine learning", "data science", "cybersecurity", "cloud", "mobile", "gaming", "e-commerce", "logistics", "supply chain", "construction", "architecture", "design", "fashion", "food", "beverage", "hospitality", "travel", "tourism", "sports", "fitness", "wellness"]
+            
+            # Look for industry keywords in the query
+            for keyword in industry_keywords:
+                if keyword in query_lower:
+                    industry = keyword
+                    break
+            
+            # If no specific industry found, try to extract from common patterns
+            if not industry:
+                if "fin-tech" in query_lower or "fintech" in query_lower:
+                    industry = "fintech"
+                elif "tech" in query_lower and ("industry" in query_lower or "sector" in query_lower):
+                    industry = "technology"
+            
+            return LLMResponse(
+                query_type=QueryType.INDUSTRY_CONTACTS,
+                api_calls=[{
+                    "endpoint": "/api/v1/contacts",
+                    "method": "GET",
+                    "params": {"industry_filter": True, "industry": industry} if industry else {"industry_filter": True}
+                }],
+                visualization_type=VisualizationType.CARDS,
+                title=f"Contacts in {industry.title()} Industry" if industry else "Industry Contacts",
+                summary=f"Showing contacts working in the {industry} industry" if industry else "Showing contacts filtered by industry",
+                filters={"industry": industry} if industry else {},
+                confidence=0.7,
+                reasoning="Fallback rule-based parsing detected industry contacts query"
             )
         
         else:

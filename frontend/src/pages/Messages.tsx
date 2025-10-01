@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { TargetCompaniesModal } from '@/components/modals/TargetCompaniesModal';
+import { GmailComposeModal } from '@/components/modals/GmailComposeModal';
 import { ToolOriginatedBadgeComponent } from '@/components/ui/tool-originated-badge';
 import { storage } from '@/lib/storage';
 import { Draft, Contact, EnhancedGmailResponse, GmailEmail } from '@/types';
@@ -47,6 +48,7 @@ const Messages = () => {
   } | null>(null);
   const [isLoadingEmails, setIsLoadingEmails] = useState(false);
   const [gmailConnected, setGmailConnected] = useState(false);
+  const [isComposeModalOpen, setIsComposeModalOpen] = useState(false);
 
   useEffect(() => {
     const loadedDrafts = storage.getDrafts();
@@ -765,7 +767,10 @@ const Messages = () => {
                 <div className="space-y-4">
                   {/* Top Row: Compose Message Button + Search */}
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <Button className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700">
+                    <Button
+                      className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700"
+                      onClick={() => setIsComposeModalOpen(true)}
+                    >
                       <Plus className="w-4 h-4" />
                       <span>Compose Message</span>
                     </Button>
@@ -1020,7 +1025,10 @@ const Messages = () => {
                   <p className="text-gray-600 mb-4">
                     Compose your first message to get started
                   </p>
-                  <Button className="bg-blue-600 hover:bg-blue-700">
+                  <Button
+                    className="bg-blue-600 hover:bg-blue-700"
+                    onClick={() => setIsComposeModalOpen(true)}
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Compose Message
                   </Button>
@@ -1031,6 +1039,11 @@ const Messages = () => {
         </div>
       </main>
       
+      {/* Gmail Compose Modal */}
+      <GmailComposeModal
+        isOpen={isComposeModalOpen}
+        onClose={() => setIsComposeModalOpen(false)}
+      />
     </div>
   );
 };

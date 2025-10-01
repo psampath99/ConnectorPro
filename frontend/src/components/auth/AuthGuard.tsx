@@ -70,9 +70,9 @@ const AuthGuard: React.FC<AuthGuardProps> = ({
     case 'auth-only':
       // Auth-only routes (login/signup) should redirect authenticated users
       if (isAuthenticated) {
-        // Special handling for demo users - always redirect to settings
+        // Special handling for demo users - always redirect to AI Assistant
         if (isDemoUser) {
-          return <Navigate to="/settings" replace />;
+          return <Navigate to="/ai-assistant" replace />;
         }
         
         const hasOnboarding = hasCompletedOnboarding();
@@ -81,9 +81,8 @@ const AuthGuard: React.FC<AuthGuardProps> = ({
           // User needs onboarding
           return <Navigate to="/onboarding" replace />;
         } else {
-          // User is authenticated and has completed onboarding
-          const intendedPath = getIntendedPath();
-          return <Navigate to={intendedPath} replace />;
+          // User is authenticated and has completed onboarding - go to dashboard
+          return <Navigate to="/dashboard" replace />;
         }
       }
       
@@ -99,11 +98,16 @@ const AuthGuard: React.FC<AuthGuardProps> = ({
       // Demo users can access all protected routes normally
       // The initial redirect to Settings is handled by the /demo route in App.tsx
 
-      // Check if onboarding is required for this route (skip for demo users)
+      // Check if onboarding is required for this route (skip for demo users and return users)
       if (requireOnboarding && !isDemoUser) {
         const hasOnboarding = hasCompletedOnboarding();
         
-        if (!hasOnboarding && location.pathname !== '/onboarding') {
+        // Only redirect to onboarding if user is truly new (no user data at all)
+        // Return users who have logged in before should skip onboarding
+        const userData = localStorage.getItem('connectorpro_user');
+        const isReturnUser = !!userData;
+        
+        if (!hasOnboarding && !isReturnUser && location.pathname !== '/onboarding') {
           return <Navigate to="/onboarding" replace />;
         }
       }

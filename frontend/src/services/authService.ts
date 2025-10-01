@@ -222,6 +222,22 @@ class AuthService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        
+        // Handle FastAPI validation errors (422)
+        if (response.status === 422 && errorData.detail && Array.isArray(errorData.detail)) {
+          const validationErrors = errorData.detail.map((error: any) => {
+            if (error.msg) {
+              return error.msg;
+            }
+            return `${error.loc?.join(' ')} - ${error.msg || 'Validation error'}`;
+          }).join('. ');
+          
+          throw new AuthError(
+            validationErrors || 'Please check your input and try again.',
+            response.status
+          );
+        }
+        
         throw new AuthError(
           errorData.detail || 'Registration failed. Please try again.',
           response.status

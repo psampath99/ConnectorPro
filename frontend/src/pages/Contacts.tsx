@@ -10,6 +10,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { TargetCompaniesModal } from '@/components/modals/TargetCompaniesModal';
+import { GmailComposeModal } from '@/components/modals/GmailComposeModal';
+import { CalendarInviteModal } from '@/components/modals/CalendarInviteModal';
 import { storage } from '@/lib/storage';
 import { Contact } from '@/types';
 import { 
@@ -49,6 +51,9 @@ const Contacts = () => {
   const [filterCompany, setFilterCompany] = useState<string>('all');
   const [timeframe, setTimeframe] = useState<string>('7');
   const [targetCompanies, setTargetCompanies] = useState<string[]>([]);
+  const [isGmailModalOpen, setIsGmailModalOpen] = useState(false);
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
 
   useEffect(() => {
     // Load contacts from both localStorage and API
@@ -253,8 +258,18 @@ const Contacts = () => {
 
   const handleDirectMessage = (contactId: string) => {
     const contact = contacts.find(c => c.id === contactId);
-    console.log(`Send direct message to ${contact?.name}`);
-    // This would typically open a direct message modal or navigate to message creation
+    if (contact) {
+      setSelectedContact(contact);
+      setIsGmailModalOpen(true);
+    }
+  };
+
+  const handleScheduleMeeting = (contactId: string) => {
+    const contact = contacts.find(c => c.id === contactId);
+    if (contact) {
+      setSelectedContact(contact);
+      setIsCalendarModalOpen(true);
+    }
   };
 
   return (
@@ -434,11 +449,20 @@ const Contacts = () => {
                                       <div className="flex items-center justify-between">
                                         <h5 className="font-medium text-gray-900">{contact.name}</h5>
                                         <div className="flex items-center space-x-2">
-                                          <Button size="sm" className="h-7 px-2 text-xs">
+                                          <Button
+                                            size="sm"
+                                            className="h-7 px-2 text-xs"
+                                            onClick={() => handleDirectMessage(contact.id)}
+                                          >
                                             <MessageSquare className="w-3 h-3 mr-1" />
                                             Message
                                           </Button>
-                                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs">
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 px-2 text-xs"
+                                            onClick={() => handleScheduleMeeting(contact.id)}
+                                          >
                                             <Calendar className="w-3 h-3 mr-1" />
                                             Meet
                                           </Button>
@@ -542,6 +566,30 @@ const Contacts = () => {
           </div>
         </div>
       </main>
+      
+      {/* Gmail Compose Modal */}
+      <GmailComposeModal
+        isOpen={isGmailModalOpen}
+        onClose={() => {
+          setIsGmailModalOpen(false);
+          setSelectedContact(null);
+        }}
+        prefilledTo={selectedContact?.email || ''}
+        prefilledSubject={selectedContact ? `Following up - ${selectedContact.name}` : ''}
+        prefilledBody={selectedContact ? `Hi ${selectedContact.name.split(' ')[0]},\n\nI hope this message finds you well.\n\nBest regards` : ''}
+      />
+      
+      {/* Calendar Invite Modal */}
+      <CalendarInviteModal
+        isOpen={isCalendarModalOpen}
+        onClose={() => {
+          setIsCalendarModalOpen(false);
+          setSelectedContact(null);
+        }}
+        prefilledTitle={selectedContact ? `Meeting with ${selectedContact.name}` : ''}
+        prefilledAttendees={selectedContact?.email ? [selectedContact.email] : []}
+        prefilledDescription={selectedContact ? `Meeting with ${selectedContact.name} from ${selectedContact.company}` : ''}
+      />
     </div>
   );
 };

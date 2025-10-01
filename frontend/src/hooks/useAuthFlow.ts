@@ -52,38 +52,24 @@ export const useAuthFlow = (options: AuthFlowOptions = {}) => {
     const intendedPath = getIntendedPath();
     const hasOnboarding = hasCompletedOnboarding();
 
-    // --- Test Override ---
-    // This flag skips the standard onboarding flow for new users and redirects them
-    // directly to the settings page. This is for testing purposes only.
-    // To re-enable the normal onboarding flow, set this to `false`.
-    const SKIP_ONBOARDING_FOR_NEW_USERS = true;
+    // Check if user has any stored data (indicating they're a return user)
+    const userData = localStorage.getItem('connectorpro_user');
+    const isReturnUser = !!userData;
 
-    if (isNewUser && SKIP_ONBOARDING_FOR_NEW_USERS) {
+    if (isNewUser && !isReturnUser) {
+      // Truly new users go to settings page (as per requirements)
       navigate('/settings', { replace: true });
       toast({
-        title: "Welcome! Skipping onboarding for testing.",
-        description: "You have been redirected to the settings page.",
+        title: "Welcome to ConnectorPro!",
+        description: "Let's set up your profile in settings.",
       });
-      return;
-    }
-    // --- End Test Override ---
-
-    if (isNewUser || !hasOnboarding) {
-      // New users or users who haven't completed onboarding go to onboarding
-      if (location.pathname !== '/onboarding') {
-        navigate('/onboarding', { replace: true });
-        toast({
-          title: "Welcome to ConnectorPro!",
-          description: "Let's get you set up with a quick onboarding process.",
-        });
-      }
     } else {
-      // Returning users go to intended destination
+      // Return users or users with existing data go to dashboard
       if (location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/onboarding') {
-        navigate(intendedPath, { replace: true });
+        navigate('/dashboard', { replace: true });
         toast({
           title: "Welcome back!",
-          description: `Redirected to ${intendedPath === '/dashboard' ? 'dashboard' : intendedPath}`,
+          description: "Redirected to dashboard",
         });
       }
     }

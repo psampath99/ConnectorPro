@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -186,6 +187,7 @@ const PasswordCreationStep = ({
 );
 
 export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [data, setData] = useState<UnifiedOnboardingData>({
     // Page 1 Data
@@ -287,6 +289,19 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       if (!registerResponse.ok) {
         const errorData = await registerResponse.json().catch(() => ({}));
         console.error('🔍 [DEBUG] Backend registration failed:', errorData);
+        
+        // Handle FastAPI validation errors (422)
+        if (registerResponse.status === 422 && errorData.detail && Array.isArray(errorData.detail)) {
+          const validationErrors = errorData.detail.map((error: any) => {
+            if (error.msg) {
+              return error.msg;
+            }
+            return `${error.loc?.join(' ')} - ${error.msg || 'Validation error'}`;
+          }).join('. ');
+          
+          throw new Error(validationErrors || 'Please check your input and try again.');
+        }
+        
         throw new Error(errorData.detail || 'Registration failed');
       }
 
@@ -343,8 +358,8 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       storage.setOnboardingData(onboardingDataForStorage, 'gmail'); // Default email provider
       console.log('🔍 [DEBUG] ✅ User registered with backend and onboarding data saved');
       
-      // Navigate to settings page after account creation
-      window.location.href = '/settings';
+      // Navigate to settings page after account creation (as per requirements: New users → Settings page)
+      navigate('/settings', { replace: true });
       
       onComplete(user);
       

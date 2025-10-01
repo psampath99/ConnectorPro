@@ -24,12 +24,12 @@ import Signup from "./pages/SignUp";
 import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
 import NotFound from "./pages/NotFound";
 
-// Demo Settings component that ensures demo context is set
-const DemoSettings = () => {
+// Demo AI Assistant component that ensures demo context is set
+const DemoAIAssistant = () => {
   const { isDemoUser, loginAsDemo } = useAuth();
   
   useEffect(() => {
-    console.log('🔍 [DEBUG] DemoSettings component mounted, isDemoUser:', isDemoUser);
+    console.log('🔍 [DEBUG] DemoAIAssistant component mounted, isDemoUser:', isDemoUser);
     
     // If not already a demo user, set up demo context
     if (!isDemoUser) {
@@ -38,7 +38,7 @@ const DemoSettings = () => {
     }
   }, [isDemoUser, loginAsDemo]);
   
-  return <Settings />;
+  return <AIAssistant />;
 };
 
 const queryClient = new QueryClient({
@@ -80,7 +80,7 @@ const App = () => {
                 {/* Demo route - bypasses all authentication */}
                 <Route
                   path="/demo"
-                  element={<DemoSettings />}
+                  element={<DemoAIAssistant />}
                 />
               <Route
                 path="/login"

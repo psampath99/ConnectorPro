@@ -155,10 +155,9 @@ export function AIAssistantQueryInterface({ className }: AIAssistantQueryInterfa
   };
 
   const renderResponse = (response: QueryResponse) => {
-    // The new RAG-based backend returns CSV-like data, which is best displayed in a table.
-    // This function now dynamically creates a table from the response data.
+    // Handle table visualization
     if (response.visualType === 'table' && Array.isArray(response.data) && response.data.length > 0) {
-      const headers = Object.keys(response.data);
+      const headers = Object.keys(response.data[0]); // Get keys from first item
       return (
         <div className="space-y-4">
           <div className="flex items-center space-x-2">
@@ -184,11 +183,82 @@ export function AIAssistantQueryInterface({ className }: AIAssistantQueryInterfa
       );
     }
     
-    // Fallback for non-table data or empty data
+    // Handle cards visualization (for contacts)
+    if (response.visualType === 'cards' && Array.isArray(response.data) && response.data.length > 0) {
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <Users className="w-5 h-5 text-blue-600" />
+            <h4 className="font-semibold text-gray-900">{response.title}</h4>
+          </div>
+          <p className="text-sm text-gray-600">{response.summary}</p>
+          <div className="grid gap-3 max-h-96 overflow-y-auto">
+            {response.data.slice(0, 20).map((contact: any, index: number) => (
+              <div key={index} className="border border-gray-200 rounded-lg p-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h5 className="font-medium text-gray-900">{contact.Name}</h5>
+                    {contact.Title && <p className="text-sm text-gray-600">{contact.Title}</p>}
+                    {contact.Company && <p className="text-sm text-blue-600">{contact.Company}</p>}
+                  </div>
+                  {contact.LinkedIn && (
+                    <a
+                      href={contact.LinkedIn}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 text-sm"
+                    >
+                      LinkedIn
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+            {response.data.length > 20 && (
+              <p className="text-sm text-gray-500 text-center">
+                Showing first 20 of {response.data.length} contacts
+              </p>
+            )}
+          </div>
+        </div>
+      );
+    }
+    
+    // Handle text responses
+    if (response.visualType === 'text' || response.type === 'analytics') {
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <TrendingUp className="w-5 h-5 text-blue-600" />
+            <h4 className="font-semibold text-gray-900">{response.title}</h4>
+          </div>
+          <p className="text-sm text-gray-600">{response.summary}</p>
+          {response.data && typeof response.data === 'object' && (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="grid grid-cols-2 gap-4">
+                {Object.entries(response.data).map(([key, value]) => (
+                  <div key={key} className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">{value as string}</div>
+                    <div className="text-sm text-gray-600 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    // Fallback for any other cases
     return (
       <div className="space-y-2">
         <h4 className="font-semibold text-gray-900">{response.title}</h4>
         <p className="text-gray-600">{response.summary || 'No data to display.'}</p>
+        {response.data && (
+          <pre className="text-xs bg-gray-100 p-2 rounded overflow-auto">
+            {JSON.stringify(response.data, null, 2)}
+          </pre>
+        )}
       </div>
     );
   };

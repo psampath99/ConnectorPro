@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { TargetCompaniesModal } from '@/components/modals/TargetCompaniesModal';
+import { CalendarInviteModal } from '@/components/modals/CalendarInviteModal';
 import { storage } from '@/lib/storage';
 import { Meeting, Contact } from '@/types';
 import { 
@@ -39,6 +40,7 @@ const Meetings = () => {
   const [filterTargetCompany, setFilterTargetCompany] = useState<string>('all');
   const [timeframe, setTimeframe] = useState<string>('7');
   const [targetCompanies, setTargetCompanies] = useState<string[]>([]);
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
 
   useEffect(() => {
     const loadedMeetings = storage.getMeetings();
@@ -591,7 +593,10 @@ const Meetings = () => {
                 <div className="space-y-4">
                   {/* Top Row: Schedule Meeting Button + Search */}
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <Button className="flex items-center space-x-2 bg-teal-600 hover:bg-teal-700">
+                    <Button
+                      className="flex items-center space-x-2 bg-teal-600 hover:bg-teal-700"
+                      onClick={() => setIsCalendarModalOpen(true)}
+                    >
                       <Plus className="w-4 h-4" />
                       <span>Schedule Meeting</span>
                     </Button>
@@ -771,7 +776,10 @@ const Meetings = () => {
                   <p className="text-gray-600 mb-4">
                     Schedule your first meeting to get started
                   </p>
-                  <Button className="bg-teal-600 hover:bg-teal-700">
+                  <Button
+                    className="bg-teal-600 hover:bg-teal-700"
+                    onClick={() => setIsCalendarModalOpen(true)}
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Schedule Meeting
                   </Button>
@@ -782,6 +790,11 @@ const Meetings = () => {
         </div>
       </main>
       
+      {/* Calendar Invite Modal */}
+      <CalendarInviteModal
+        isOpen={isCalendarModalOpen}
+        onClose={() => setIsCalendarModalOpen(false)}
+      />
     </div>
   );
 };
