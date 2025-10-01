@@ -29,6 +29,7 @@ motor==3.3.2
 multidict==6.6.4
 oauthlib==3.3.1
 openpyxl==3.1.2
+pandas==2.2.3
 propcache==0.3.2
 proto-plus==1.26.1
 protobuf==6.32.1
